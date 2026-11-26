@@ -96,7 +96,8 @@ const isCoStar = name => { const k = coKey(name); return !!k && COSTAR.has(k); }
 function coStarSave() { const v = [...COSTAR]; try { localStorage.setItem('ud-coStar', JSON.stringify({ v })); } catch {} if (typeof udSet === 'function') udSet('coStar', v, 300); }
 const coStarBtn = (name, big) => { const on = isCoStar(name); return `<button type="button" class="${big ? 'flag-btn star' : 'co-star'}${on ? ' on' : ''}" data-costar="${esc(coKey(name))}" aria-pressed="${on}" title="${on ? '관심 회사 해제' : '관심 회사로 표시'}" aria-label="${on ? '관심 회사 해제' : '관심 회사로 표시'}">${big ? (on ? '★ 관심 회사 해제' : '☆ 관심 회사') : on ? '★' : '☆'}</button>`; };
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('[data-costar]'); if (!b) return; e.preventDefault(); e.stopPropagation(); const k = b.dataset.costar; if (COSTAR.has(k)) COSTAR.delete(k); else COSTAR.add(k); coStarSave();
-  document.querySelectorAll(`[data-costar="${CSS.escape(k)}"]`).forEach(x => { const big = x.classList.contains('flag-btn'), on = COSTAR.has(k); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); x.textContent = big ? (on ? '★ 관심 회사 해제' : '☆ 관심 회사') : on ? '★' : '☆'; x.title = on ? '관심 회사 해제' : '관심 회사로 표시'; }); }, true);
+  document.querySelectorAll(`[data-costar="${CSS.escape(k)}"]`).forEach(x => { const big = x.classList.contains('flag-btn'), on = COSTAR.has(k); x.classList.toggle('on', on); x.setAttribute('aria-pressed', on); x.textContent = big ? (on ? '★ 관심 회사 해제' : '☆ 관심 회사') : on ? '★' : '☆'; x.title = on ? '관심 회사 해제' : '관심 회사로 표시'; });
+  if (show.cur === 'near') { KM.pick = null; const y = scrollY; vNear().then(() => scrollTo(0, y)); } }, true);
 function hidWhySave() { try { localStorage.setItem('ud-hiddenCoWhy', JSON.stringify({ v: HIDWHY })); } catch {} if (typeof udSet === 'function') udSet('hiddenCoWhy', HIDWHY, 300); }
 function hidCoSave() { const v = [...HIDCO]; try { localStorage.setItem('ud-hiddenCos', JSON.stringify({ v })); } catch {} if (typeof udSet === 'function') udSet('hiddenCos', v, 300); }
 const hidCoBtn = name => `<button class="ghost" data-hidco="${esc(coKey(name))}" data-coname2="${esc(plain(name))}" title="${isHidCo(name) ? '이 회사 공고를 다시 목록에 보여요' : '이 회사의 공고를 모두 목록·추천·대시보드에서 숨겨요(내 계정에만 저장, 언제든 되돌릴 수 있어요)'}">${isHidCo(name) ? '↩ 회사 제외 취소' : '🚫 이 회사 제외'}</button>`;
@@ -5350,6 +5351,11 @@ const GEO = DATA.geo || {};
 const geoOf = name => { const k = coKey(name); return GEO[k] || GEO[Object.keys(GEO).find(x => x && (x.includes(k) || k.includes(x)) && Math.min(x.length, k.length) >= 3) || ''] || null; };
 const kmBetween = (a, b) => { const R = 6371, r = x => x * Math.PI / 180, dLa = r(b[0] - a[0]), dLo = r(b[1] - a[1]); const h = Math.sin(dLa / 2) ** 2 + Math.cos(r(a[0])) * Math.cos(r(b[0])) * Math.sin(dLo / 2) ** 2; return 2 * R * Math.asin(Math.sqrt(h)); };
 const NEAR = { places: (() => { try { return JSON.parse(store.get('places', '[]')) || []; } catch { return []; } })(), r: +store.get('nearR', '20') || 20, only: store.get('nearOnly', 'jobs'), sel: store.get('nearSel', ''), loaded: false, msg: '', busy: false };
+const NEAR_VIEWS = [['jobs', '공고 있는 회사'], ['hi', '적합 공고 있는 회사'], ['interestJob', '💗 관심 공고가 있는 회사'], ['interestCompany', '★ 관심 회사'], ['interestAny', '💜 둘 중 하나'], ['all', '모든 회사']];
+const nearFlags = name => ({ job: (apps || []).some(a => a && sameCo(a['기업'], name) && appGroup(a) === 'interest'), company: isCoStar(name) });
+const nearKind = name => { const f = nearFlags(name); return f.job && f.company ? 'both' : f.job ? 'job' : f.company ? 'company' : ''; };
+const nearOk = c => { const kind = nearKind(c.name); return NEAR.only === 'all' || (NEAR.only === 'jobs' ? c.open.length : NEAR.only === 'hi' ? c.hi : NEAR.only === 'interestJob' ? kind === 'job' || kind === 'both' : NEAR.only === 'interestCompany' ? kind === 'company' || kind === 'both' : NEAR.only === 'interestAny' ? !!kind : c.open.length); };
+const nearBadges = name => { const f = nearFlags(name); return `${f.job ? '<span class="near-badge job">💗 관심 공고</span>' : ''}${f.company ? '<span class="near-badge company">★ 관심 회사</span>' : ''}`; };
 function placesSave() { store.set('places', JSON.stringify(NEAR.places)); udSet('places', NEAR.places, 300); }
 async function placesLoad() { if (NEAR.loaded || !UD.ready) return; NEAR.loaded = true; if (UD.db && UD.uid) { try { const v = await udGet('places'); if (Array.isArray(v)) { NEAR.places = v; store.set('places', JSON.stringify(v)); } } catch {} } }
 function parseLatLng(s) { // 구글 지도 링크·좌표 붙여넣기
@@ -5398,13 +5404,13 @@ function nearList() {
   const P = NEAR.places.filter(p => p.on !== false && p.ll); if (!P.length) return [];
   const all = typeof coList === 'function' ? coList() : [];
   return all.map(c => { const g = geoOf(c.name); if (!g) return null; const ds = P.map(p => ({ p, d: kmBetween(p.ll, g) })).sort((a, b) => a.d - b.d); return { c, g, near: ds[0], ds }; })
-    .filter(x => x && x.near.d <= NEAR.r && (NEAR.only === 'all' || (NEAR.only === 'jobs' ? x.c.open.length : x.c.hi))).sort((a, b) => a.near.d - b.near.d);
+    .filter(x => x && x.near.d <= NEAR.r && nearOk(x.c)).sort((a, b) => a.near.d - b.near.d);
 }
 function nearRadar(list) {
   const P = NEAR.places.filter(p => p.on !== false && p.ll), ctr = P.find(p => p.id === NEAR.sel) || P[0]; if (!ctr) return '';
   const S = 300, C = S / 2, R = NEAR.r, sc = (C - 18) / R, rings = [R / 4, R / 2, R * 3 / 4, R].map(x => Math.round(x * 10) / 10);
   const xy = ll => { const dx = (ll[1] - ctr.ll[1]) * 111.32 * Math.cos(ctr.ll[0] * Math.PI / 180), dy = (ll[0] - ctr.ll[0]) * 110.57; return [C + dx * sc, C - dy * sc]; };
-  const dots = list.map(x => { const d = kmBetween(ctr.ll, x.g); if (d > R) return ''; const [px, py] = xy(x.g); return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${x.c.hi ? 6 : 4}" class="nr-dot${x.c.hi ? ' hi' : ''}" data-ndot="${esc(x.c.name)}" data-tip="${esc(kmTip(x.c) + ' · ' + d.toFixed(1) + 'km')}" aria-label="${esc(plain(x.c.name))}"></circle>`; }).join('');
+  const dots = list.map(x => { const d = kmBetween(ctr.ll, x.g); if (d > R) return ''; const [px, py] = xy(x.g), kind = nearKind(x.c.name); return `<circle cx="${px.toFixed(1)}" cy="${py.toFixed(1)}" r="${kind ? 7 : x.c.hi ? 6 : 4}" class="nr-dot${kind ? ' ' + kind : x.c.hi ? ' hi' : ''}" data-ndot="${esc(x.c.name)}" data-tip="${esc(kmTip(x.c) + ' · ' + d.toFixed(1) + 'km')}" aria-label="${esc(plain(x.c.name))}"></circle>`; }).join('');
   const others = P.filter(p => p !== ctr).map(p => { const d = kmBetween(ctr.ll, p.ll); if (d > R) return ''; const [px, py] = xy(p.ll); return `<text x="${px}" y="${py + 6}" text-anchor="middle" font-size="16" data-tip="${esc((p.icon || '📍') + ' ' + p.name + ' · ' + d.toFixed(1) + 'km')}">${esc(p.icon || '📍')}</text>`; }).join('');
   return `<svg viewBox="0 0 ${S} ${S}" class="nr-svg" role="img" aria-label="${esc(ctr.name)} 기준 ${R}km 안 회사 위치">
     ${rings.map(r => `<circle cx="${C}" cy="${C}" r="${(r * sc).toFixed(1)}" class="nr-ring"/><text x="${C + 3}" y="${(C - r * sc + 11).toFixed(1)}" class="d-ax">${r}km</text>`).join('')}
@@ -5426,12 +5432,12 @@ function kProv(p) {
 }
 function kmItems() {
   const all = typeof coList === 'function' ? coList() : [];
-  return all.map(c => { const g = geoOf(c.name); return g ? { c, g, p: KPROJ(g) } : null; }).filter(x => x && (NEAR.only === 'all' || (NEAR.only === 'jobs' ? x.c.open.length : x.c.hi)));
+  return all.map(c => { const g = geoOf(c.name); return g ? { c, g, p: KPROJ(g) } : null; }).filter(x => x && nearOk(x.c));
 }
 function kmInView(items) { const [x, y, w, h] = KM.vb; return items.filter(o => o.p[0] >= x && o.p[0] <= x + w && o.p[1] >= y && o.p[1] <= y + h); }
 // 확대했을 때만 이름 표시 · 겹치는 이름은 빼기(적합 회사 먼저)
-function kmLabelSet(L, r, z) { const out = [], box = []; for (const o of L.slice().sort((a, b) => b.c.hi - a.c.hi)) { const w = Math.min(14, plain(o.c.name).length) * 9 / z, h = 11 / z, x = o.p[0] + r * 1.8, y = o.p[1] - h / 2; if (box.some(q => x < q[0] + q[2] && q[0] < x + w && y < q[1] + q[3] && q[1] < y + h)) continue; box.push([x, y, w, h]); out.push(o); if (out.length >= 40) break; } return out; }
-const kmTip = c => `${plain(c.name)} · 공고 ${c.open.length}${c.hi ? ' · ⭐ 적합 ' + c.hi : ''}${c.dd !== null && c.dd !== undefined ? ' · ' + (c.dd === 0 ? '오늘 마감' : 'D-' + c.dd) : ''}`;
+function kmLabelSet(L, r, z) { const out = [], box = []; for (const o of L.slice().sort((a, b) => (!!nearKind(b.c.name) - !!nearKind(a.c.name)) || b.c.hi - a.c.hi)) { const w = Math.min(14, plain(o.c.name).length) * 9 / z, h = 11 / z, x = o.p[0] + r * 1.8, y = o.p[1] - h / 2; if (box.some(q => x < q[0] + q[2] && q[0] < x + w && y < q[1] + q[3] && q[1] < y + h)) continue; box.push([x, y, w, h]); out.push(o); if (out.length >= 40) break; } return out; }
+const kmTip = c => `${plain(c.name)} · 공고 ${c.open.length}${nearKind(c.name) ? ' · ' + (nearKind(c.name) === 'both' ? '💗 관심 공고·★ 관심 회사' : nearKind(c.name) === 'job' ? '💗 관심 공고' : '★ 관심 회사') : ''}${c.hi ? ' · 적합 ' + c.hi : ''}${c.dd !== null && c.dd !== undefined ? ' · ' + (c.dd === 0 ? '오늘 마감' : 'D-' + c.dd) : ''}`;
 // 지도 점에 마우스를 올리면 회사 이름 말풍선 (전체 지도·내 장소 지도 공용)
 (() => { let tip = null; const hide = () => { if (tip) tip.hidden = true; };
   document.addEventListener('pointerover', e => { const t = e.target.closest && e.target.closest('svg [data-tip]'); if (!t) return; const st = t.closest('.km-stage, .near-map'); if (!st) return;
@@ -5447,8 +5453,8 @@ function kmSvg(items) {
     ${KMAP.map(([n, d]) => `<path d="${d}" class="km-prov" style="stroke-width:${sw}"><title>${n}</title></path>`).join('')}
     ${KM.pick ? `<circle cx="${KM.pick.x.toFixed(3)}" cy="${KM.pick.y.toFixed(3)}" r="${KM.pick.ru.toFixed(3)}" class="km-pick" style="stroke-width:${(1.5 / z).toFixed(3)}"/>` : ''}
     ${Object.entries(labels).map(([n, ll]) => { const p = KPROJ([ll[1], ll[0]]); return `<text x="${p[0].toFixed(1)}" y="${p[1].toFixed(1)}" class="km-lbl" style="font-size:${fs}px">${n}</text>`; }).join('')}
-    ${items.slice().sort((a, b) => (a.c.hi ? 1 : 0) - (b.c.hi ? 1 : 0)).map(o => `<circle cx="${o.p[0].toFixed(3)}" cy="${o.p[1].toFixed(3)}" r="${(o.c.hi ? r * 1.4 : r).toFixed(3)}" class="km-dot${o.c.hi ? ' hi' : ''}${KM.sel === o.c.name || (PK && PK.has(o.c.name)) ? ' sel' : ''}" style="stroke-width:${(r / 3).toFixed(3)}" data-kdot="${esc(o.c.name)}" data-tip="${esc(kmTip(o.c))}" aria-label="${esc(plain(o.c.name))}"></circle>`).join('')}
-    ${z >= 7 ? kmLabelSet(kmInView(items).filter(o => o.c.hi || z >= 16), r, z).map(o => `<text x="${(o.p[0] + r * 1.8).toFixed(3)}" y="${(o.p[1] + r * 0.6).toFixed(3)}" class="km-name${o.c.hi ? ' hi' : ''}" style="font-size:${(10 / z).toFixed(3)}px">${esc(plain(o.c.name).replace(/\(주\)|㈜|주식회사/g, '').trim().slice(0, 14))}</text>`).join('') : ''}
+    ${items.slice().sort((a, b) => (!!nearKind(a.c.name) - !!nearKind(b.c.name)) || (!!a.c.hi - !!b.c.hi)).map(o => { const kind = nearKind(o.c.name); return `<circle cx="${o.p[0].toFixed(3)}" cy="${o.p[1].toFixed(3)}" r="${(kind ? r * 1.65 : o.c.hi ? r * 1.4 : r).toFixed(3)}" class="km-dot${kind ? ' ' + kind : o.c.hi ? ' hi' : ''}${KM.sel === o.c.name || (PK && PK.has(o.c.name)) ? ' sel' : ''}" style="stroke-width:${(r / 3).toFixed(3)}" data-kdot="${esc(o.c.name)}" data-tip="${esc(kmTip(o.c))}" aria-label="${esc(plain(o.c.name))}"></circle>`; }).join('')}
+    ${z >= 7 ? kmLabelSet(kmInView(items).filter(o => nearKind(o.c.name) || o.c.hi || z >= 16), r, z).map(o => { const kind = nearKind(o.c.name); return `<text x="${(o.p[0] + r * 1.8).toFixed(3)}" y="${(o.p[1] + r * 0.6).toFixed(3)}" class="km-name${kind ? ' ' + kind : o.c.hi ? ' hi' : ''}" style="font-size:${(10 / z).toFixed(3)}px">${esc(plain(o.c.name).replace(/\(주\)|㈜|주식회사/g, '').trim().slice(0, 14))}</text>`; }).join('') : ''}
     ${(NEAR.places || []).filter(p => p.on !== false && p.ll).map(p => { const q = KPROJ(p.ll); return `<g class="km-me" data-tip="${esc((p.icon || '📍') + ' ' + p.name + (p.approx ? ' (대략 위치)' : ''))}"><text x="${q[0].toFixed(3)}" y="${(q[1] + 6 / z).toFixed(3)}" text-anchor="middle" style="font-size:${(18 / z).toFixed(3)}px">${esc(p.icon || '📍')}</text><text x="${q[0].toFixed(3)}" y="${(q[1] + 17 / z).toFixed(3)}" text-anchor="middle" class="km-me-lbl" style="font-size:${(9.5 / z).toFixed(3)}px">${esc(p.name)}</text></g>`; }).join('')}
   </svg>`;
 }
@@ -5458,7 +5464,7 @@ function kmPickBox(items) {
   const L = KM.pick.names.map(n => items.find(o => o.c.name === n)).filter(Boolean), one = L.length === 1;
   const dd = d => d === null || d === undefined ? '상시' : d === 0 ? '오늘 마감' : 'D-' + d;
   return `<div class="km-pickbox" id="kmPick"><div class="top"><b>📍 ${one ? '선택한 회사' : `선택한 곳 주변 회사 ${L.length}곳`}</b><button type="button" class="linkish" data-kpx>선택 해제</button></div>
-    ${L.map(o => `<div class="km-pc"><div class="km-pch"><b>${esc(plain(o.c.name))}</b><span class="pill">공고 ${o.c.open.length}</span>${o.c.hi ? `<span class="pill high">⭐ 적합 ${o.c.hi}</span>` : ''}<span class="note">${esc(geoAddr(o.c.name) || o.c.area || '')}</span></div>
+    ${L.map(o => `<div class="km-pc"><div class="km-pch"><b>${esc(plain(o.c.name))}</b>${nearBadges(o.c.name)}<span class="pill">공고 ${o.c.open.length}</span>${o.c.hi ? `<span class="pill high">⭐ 적합 ${o.c.hi}</span>` : ''}<span class="note">${esc(geoAddr(o.c.name) || o.c.area || '')}</span></div>
       <ul class="km-jobs">${o.c.open.map(j => `<li><button type="button" class="km-job" data-kjob="${esc(prepKey(j))}"><b>${esc(j.title)}</b><span class="note">${dd(j.dd)}${j.fit ? ' · ' + esc(FIT_LABEL[j.fit] || '') : ''}${appOfJob(j) ? ' · 📨 ' + esc(plain(appOfJob(j)['결과'])) : ''}</span><i aria-hidden="true">→</i></button></li>`).join('') || '<li class="note">열린 공고가 없어요</li>'}</ul>
       <div class="links"><button type="button" class="ghost" data-coname="${esc(o.c.name)}">🏢 회사 정보</button><a href="${gmap(geoAddr(o.c.name) || plain(o.c.name))}" target="_blank" rel="noopener">구글 지도</a></div></div>`).join('')}</div>`;
 }
@@ -5467,20 +5473,20 @@ document.addEventListener('click', e => {
   const x = e.target.closest && e.target.closest('[data-kpx]'); if (x) { e.preventDefault(); KM.pick = null; const y = scrollY; vNear().then(() => scrollTo(0, y)); }
 });
 function kmView(head) {
-  const items = kmItems(), inv = kmInView(items).sort((a, b) => (KM.sel === b.c.name) - (KM.sel === a.c.name) || b.c.hi - a.c.hi || b.c.open.length - a.c.open.length || (a.c.dd ?? 999) - (b.c.dd ?? 999));
+  const items = kmItems(), inv = kmInView(items).sort((a, b) => (KM.sel === b.c.name) - (KM.sel === a.c.name) || (!!nearKind(b.c.name) - !!nearKind(a.c.name)) || b.c.hi - a.c.hi || b.c.open.length - a.c.open.length || (a.c.dd ?? 999) - (b.c.dd ?? 999));
   const RG = { 수도권: ['서울', '경기', '인천'], '충청·대전': ['충남', '충북', '대전', '세종'], '경상·부산': ['부산', '울산', '대구', '경북', '경남'], '전라·광주': ['광주', '전남', '전북'], 강원: ['강원'], 제주: ['제주'] };
   const regCount = KREG.map(([n, vb]) => [n, vb, n === '전국' ? items.length : items.filter(o => RG[n].includes(kProv(o.p))).length]);
   return `${head}<div class="km">
     <section class="row km-mapbox"><div class="top"><b>🗺 회사 지도</b><span class="note">${items.length}곳 표시 · 보이는 범위 ${inv.length}곳</span></div>
       <div class="tags km-chips">${regCount.filter(([n, , k]) => k || n === '전국').map(([n, vb, k]) => `<button type="button" class="chip-toggle" data-kreg="${vb.join(',')}" aria-pressed="${KM.vb.join(',') === vb.join(',')}">${n} <b>${k}</b></button>`).join('')}</div>
-      <div class="filters"><label>보기 <select id="kmOnly" data-def="jobs">${[['jobs', '공고 있는 회사'], ['hi', '적합 공고 있는 회사'], ['all', '모든 회사']].map(([k, t]) => `<option value="${k}" ${NEAR.only === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
+      <div class="filters"><label>보기 <select id="kmOnly" data-def="jobs">${NEAR_VIEWS.map(([k, t]) => `<option value="${k}" ${NEAR.only === k ? 'selected' : ''}>${t}</option>`).join('')}</select></label></div>
       <div class="km-stage">${kmSvg(items)}<div class="km-zoom"><button type="button" data-kz="0.6" aria-label="확대">＋</button><button type="button" data-kz="1.6" aria-label="축소">－</button></div></div>
       <p class="note km-hint">☝️ 한 손가락으로 끌어서 이동 · ✌️ 두 손가락으로 벌리거나 오므려 확대·축소 · 톡 누르면 그 자리 회사 보기 (페이지 스크롤은 지도 바깥에서)</p>
       ${kmPickBox(items)}
-      <p class="note"><span class="km-key"></span> 공고 있는 회사 · <span class="km-key hi"></span> ⭐ 적합 공고 있는 회사 · 📍 내 장소 · 점에 마우스를 올리면 이름 · <b>지도를 누르면 그 주변 회사가 아래에 모여요</b>(몰려 있는 곳도 한 번에) · 끌어서 이동, 휠·＋/－로 확대</p>
+      <p class="note"><span class="km-key"></span> 일반 · <span class="km-key hi"></span> 적합 · <span class="km-key job"></span> 관심 공고 · <span class="km-key company"></span> 관심 회사 · <span class="km-key both"></span> 둘 다 · 📍 내 장소 · 점에 마우스를 올리면 이름 · <b>지도를 누르면 그 주변 회사가 아래에 모여요</b>(몰려 있는 곳도 한 번에) · 끌어서 이동, 휠·＋/－로 확대</p>
       <p class="note">회사 위치는 공고 주소로 찾은 좌표(일부는 구·시 단위 대략값, 지도 데이터 © OpenStreetMap 기여자) · 시·도 경계: 통계청(southkorea-maps)</p></section>
-    <section class="row km-list"><div class="top"><b>보이는 범위의 회사 ${inv.length}곳</b><span class="note">적합 공고 많은 순</span></div>
-      <div class="near-list">${inv.map(o => `<div class="near-c${KM.sel === o.c.name ? ' flash' : ''}" data-nco="${esc(o.c.name)}"><div class="top"><b>${esc(plain(o.c.name))}</b>${o.c.hi ? `<span class="pill high">적합 ${o.c.hi}</span>` : ''}</div>
+    <section class="row km-list"><div class="top"><b>보이는 범위의 회사 ${inv.length}곳</b><span class="note">관심 표시·적합 공고 순</span></div>
+      <div class="near-list">${inv.map(o => `<div class="near-c${nearKind(o.c.name) ? ' ' + nearKind(o.c.name) : ''}${KM.sel === o.c.name ? ' flash' : ''}" data-nco="${esc(o.c.name)}"><div class="top"><b>${esc(plain(o.c.name))}</b>${nearBadges(o.c.name)}${o.c.hi ? `<span class="pill high">적합 ${o.c.hi}</span>` : ''}${coStarBtn(o.c.name)}</div>
         <span class="note">📍 ${esc(geoAddr(o.c.name) || o.c.area || '')}${o.g[2] === 'area' || o.g[2] === 'city' ? ' · 위치 대략' : ''}</span>
         <div class="meta"><span>공고 ${o.c.open.length}</span>${o.c.dd !== null ? `<span>·</span><span>${o.c.dd === 0 ? '오늘 마감' : 'D-' + o.c.dd}</span>` : ''}${o.c.cats[0] ? `<span>·</span><span>${esc(o.c.cats[0])}</span>` : ''}</div>
         <div class="links"><button class="ghost" data-coname="${esc(o.c.name)}">회사 정보</button><a href="${gmap(geoAddr(o.c.name) || plain(o.c.name))}" target="_blank" rel="noopener">구글 지도</a></div></div>`).join('') || '<div class="empty">이 범위에는 회사가 없어요. 지역 버튼을 눌러 보세요.</div>'}</div></section></div>`;
@@ -5528,7 +5534,7 @@ async function vNear() {
   const bindMode = () => { document.querySelectorAll('[data-nmode]').forEach(b => b.onclick = () => { NEAR.mode = b.dataset.nmode; store.set('nearMode', NEAR.mode); reN(); }); };
   if (NEAR.mode === 'map') {
     $('#view').innerHTML = kmView(head); bindMode(); kmBind(reN);
-    const ko = $('#kmOnly'); if (ko) ko.onchange = e => { NEAR.only = e.target.value; store.set('nearOnly', NEAR.only); reN(); };
+    const ko = $('#kmOnly'); if (ko) ko.onchange = e => { NEAR.only = e.target.value; KM.pick = null; store.set('nearOnly', NEAR.only); reN(); };
     document.querySelectorAll('[data-coname]').forEach(b => b.onclick = () => { const n = b.dataset.coname; show('co:' + encodeURIComponent(coKey(n)), n); });
     return;
   }
@@ -5545,14 +5551,14 @@ async function vNear() {
       <p class="note" id="npMsg">${esc(NEAR.msg)}</p>
       <div class="top" style="margin-top:6px"><b>📏 거리</b><span class="note">직선거리</span></div>
       <div class="tags">${[5, 10, 20, 30, 50].map(r => `<button type="button" class="chip-toggle" data-nr="${r}" aria-pressed="${NEAR.r === r}">${r}km</button>`).join('')}</div>
-      <div class="tags">${[['jobs', '공고 있는 회사'], ['hi', '적합 공고 있는 회사'], ['all', '모든 회사']].map(([k, t]) => `<button type="button" class="chip-toggle" data-nonly="${k}" aria-pressed="${NEAR.only === k}">${t}</button>`).join('')}</div>
+      <div class="tags near-filters">${NEAR_VIEWS.map(([k, t]) => `<button type="button" class="chip-toggle${k.startsWith('interest') ? ' ' + k : ''}" data-nonly="${k}" aria-pressed="${NEAR.only === k}">${t}</button>`).join('')}</div>
       <p class="note">회사 위치 ${nGeo}곳은 공고 주소로 찾은 좌표예요(일부는 구·시 단위 대략값). 지도 데이터 © OpenStreetMap 기여자.</p></section>
     <section class="row near-main">${act.length ? `<div class="top"><b>${act.length === 1 ? esc(act[0].name) : act.map(p => esc(p.name)).join(' · ')} ${NEAR.r}km 안 회사 ${list.length}곳</b>${act.length > 1 ? `<select id="nSel" aria-label="지도 기준 장소">${act.map(p => `<option value="${p.id}" ${p.id === NEAR.sel ? 'selected' : ''}>지도 기준: ${esc(p.name)}</option>`).join('')}</select>` : ''}</div>
-        <div class="near-grid"><div class="near-map">${nearRadar(list)}<p class="note"><span class="km-key"></span> 회사 · <span class="km-key hi"></span> ⭐ 적합 공고 있는 회사 · 점에 마우스를 올리면 이름</p></div>
-        <div class="near-list">${list.map(x => `<div class="near-c" data-nco="${esc(x.c.name)}"><div class="top"><b>${esc(plain(x.c.name))}</b><span class="pill ${x.near.d <= 10 ? 'high' : x.near.d <= 20 ? 'mid' : ''}">${x.near.d.toFixed(1)}km${act.length > 1 ? ' · ' + esc(x.near.p.name) : ''}${(() => { const t = cmRow(x.near.p, x.c.name); return t ? ' · 🚇 ' + cmFmt(t.min) : ''; })()}</span></div>
+        <div class="near-grid"><div class="near-map">${nearRadar(list)}<p class="note"><span class="km-key"></span> 일반 · <span class="km-key hi"></span> 적합 · <span class="km-key job"></span> 관심 공고 · <span class="km-key company"></span> 관심 회사 · <span class="km-key both"></span> 둘 다 · 점에 마우스를 올리면 이름</p></div>
+        <div class="near-list">${list.map(x => `<div class="near-c${nearKind(x.c.name) ? ' ' + nearKind(x.c.name) : ''}" data-nco="${esc(x.c.name)}"><div class="top"><b>${esc(plain(x.c.name))}</b>${nearBadges(x.c.name)}<span class="pill ${x.near.d <= 10 ? 'high' : x.near.d <= 20 ? 'mid' : ''}">${x.near.d.toFixed(1)}km${act.length > 1 ? ' · ' + esc(x.near.p.name) : ''}${(() => { const t = cmRow(x.near.p, x.c.name); return t ? ' · 🚇 ' + cmFmt(t.min) : ''; })()}</span>${coStarBtn(x.c.name)}</div>
           <span class="note">${esc(x.c.desc && x.c.desc !== '미확인' ? x.c.desc.slice(0, 50) : '')}${x.g[2] === 'area' || x.g[2] === 'city' ? ' · 위치 대략' : ''}</span>
           <div class="meta"><span>공고 ${x.c.open.length}</span><span>·</span><span>적합 ${x.c.hi}</span>${x.c.dd !== null ? `<span>·</span><span>${x.c.dd === 0 ? '오늘 마감' : 'D-' + x.c.dd}</span>` : ''}</div>
-          <div class="links"><button class="ghost" data-coname="${esc(x.c.name)}">회사 정보</button><a href="${gdir(x.near.p.ll, (geoAddr(x.c.name) || plain(x.c.name)))}" target="_blank" rel="noopener">🚇 길찾기</a><a href="${gmap(geoAddr(x.c.name) || plain(x.c.name))}" target="_blank" rel="noopener">구글 지도</a></div></div>`).join('') || `<div class="empty">${NEAR.r}km 안에 조건에 맞는 회사가 없어요. 거리를 늘려 보세요.</div>`}</div></div>
+          <div class="links"><button class="ghost" data-coname="${esc(x.c.name)}">회사 정보</button><a href="${gdir(x.near.p.ll, (geoAddr(x.c.name) || plain(x.c.name)))}" target="_blank" rel="noopener">🚇 길찾기</a><a href="${gmap(geoAddr(x.c.name) || plain(x.c.name))}" target="_blank" rel="noopener">구글 지도</a></div></div>`).join('') || `<div class="empty">${NEAR.only.startsWith('interest') ? '이 조건에 맞는 관심 회사가 없어요. 다른 보기를 선택하거나 관심 표시를 확인해 주세요.' : NEAR.r + 'km 안에 조건에 맞는 회사가 없어요. 거리를 늘려 보세요.'}</div>`}</div></div>
         <p class="note">거리는 직선거리예요. 실제 출퇴근 시간은 아래 🚇 통근 시간표(구글 지도 대중교통)나 회사별 🚇 길찾기로 확인하세요.</p>
         ${cmTable(act.find(p => p.id === NEAR.sel) || act[0], list)}`
       : '<div class="empty">왼쪽에서 장소를 추가하면, 그 장소에서 가까운 회사를 거리순으로 보여줘요.</div>'}</section></div>`;

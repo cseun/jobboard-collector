@@ -965,10 +965,24 @@ aside.side { gap: 8px; }
 .nr-ax { stroke: var(--line); }
 .nr-dot { fill: #7d93bd; fill-opacity: .7; stroke: var(--surface); stroke-width: 1.5; cursor: pointer; }
 .nr-dot.hi { fill: #ff8a00; fill-opacity: 1; stroke: #fff; stroke-width: 2; }
+.nr-dot.job, .km-dot.job, .km-key.job { fill: #d63384; background: #d63384; fill-opacity: 1; }
+.nr-dot.company, .km-dot.company, .km-key.company { fill: #2563eb; background: #2563eb; fill-opacity: 1; }
+.nr-dot.both, .km-dot.both, .km-key.both { fill: #7c3aed; background: #7c3aed; fill-opacity: 1; }
+.nr-dot.job, .nr-dot.company, .nr-dot.both, .km-dot.job, .km-dot.company, .km-dot.both { stroke: #fff; stroke-width: 2; }
 .nr-me { fill: var(--surface); stroke: var(--hot); stroke-width: 2.5; }
 .nr-lbl { font-size: 12px; font-weight: 700; fill: var(--ink); }
 .near-list { display: grid; gap: 8px; max-height: 70vh; overflow-y: auto; padding-right: 2px; }
 .near-c { display: grid; gap: 4px; padding: 10px 12px; background: var(--bg); border-radius: 14px; }
+.near-c.job { box-shadow: inset 4px 0 #d63384; }
+.near-c.company { box-shadow: inset 4px 0 #2563eb; }
+.near-c.both { box-shadow: inset 4px 0 #7c3aed; }
+.near-badge { display: inline-flex; align-items: center; padding: 3px 8px; border-radius: 999px; font-size: 11px; font-weight: 700; white-space: nowrap; }
+.near-badge.job { color: #a71660; background: #ffe5f2; }
+.near-badge.company { color: #1649b5; background: #e5efff; }
+.near-c .co-star { position: static; flex: 0 0 auto; margin-left: auto; }
+.near-filters .chip-toggle.interestJob[aria-pressed="true"] { border-color: #d63384; color: #a71660; background: #ffe5f2; }
+.near-filters .chip-toggle.interestCompany[aria-pressed="true"] { border-color: #2563eb; color: #1649b5; background: #e5efff; }
+.near-filters .chip-toggle.interestAny[aria-pressed="true"] { border-color: #7c3aed; color: #5b21b6; background: #ede9fe; }
 .near-c.flash { outline: 2px solid var(--accent); }
 .near-c .top { display: flex; justify-content: space-between; gap: 8px; flex-wrap: wrap; align-items: baseline; }
 .near-c .links a, .near-c .links button { padding: 5px 10px; font-size: 12px; }
@@ -985,6 +999,7 @@ aside.side { gap: 8px; }
 .km-lbl { fill: var(--muted); font-weight: 700; text-anchor: middle; pointer-events: none; opacity: .75; }
 .km-dot { fill: #7d93bd; fill-opacity: .65; stroke: #fff; cursor: pointer; }
 .km-name { fill: var(--ink); font-weight: 600; pointer-events: none; paint-order: stroke; stroke: #eef3fb; stroke-width: .25em; } .km-name.hi { fill: #c25e00; }
+.km-name.job { fill: #a71660; } .km-name.company { fill: #1649b5; } .km-name.both { fill: #5b21b6; }
 .km-me { cursor: default; } .km-me-lbl { fill: var(--hot); font-weight: 800; paint-order: stroke; stroke: #fff; stroke-width: .3em; }
 .km-tip { position: absolute; transform: translate(-50%, -100%); background: var(--ink); color: #fff; font-size: 12.5px; font-weight: 600; padding: 5px 9px; border-radius: 8px; pointer-events: none; white-space: nowrap; z-index: 5; box-shadow: 0 4px 12px rgba(0,0,0,.2); }
 .near-map { position: relative; }
@@ -997,6 +1012,7 @@ details.card.jk-focus { outline: 2px solid var(--accent); outline-offset: 3px; }
 .km-jobs { list-style: none; margin: 6px 0; padding: 0; display: grid; gap: 4px; }
 .km-job { width: 100%; text-align: left; font: inherit; font-size: 14px; display: flex; gap: 8px; align-items: center; border: 1px solid var(--line); border-radius: 8px; padding: 6px 10px; background: var(--bg); color: var(--ink); cursor: pointer; }
 .km-job:hover { border-color: var(--accent); } .km-job b { flex: 1 1 auto; font-weight: 600; } .km-job i { font-style: normal; color: var(--accent); } .km-dot.sel { fill: var(--hot); fill-opacity: 1; }
+.km-dot.sel.job { fill: #d63384; } .km-dot.sel.company { fill: #2563eb; } .km-dot.sel.both { fill: #7c3aed; }
 .km-chips .chip-toggle { padding: 5px 10px; font-size: 13px; }
 @media (max-width: 879px) { .km-svg { touch-action: none; } .km-list .near-list { max-height: none; } }
 .km-zoom { position: absolute; right: 10px; top: 10px; display: grid; gap: 4px; } .km-zoom button { font: inherit; width: 34px; height: 34px; border-radius: 10px; border: 1px solid var(--line); background: var(--surface); font-size: 18px; cursor: pointer; }
