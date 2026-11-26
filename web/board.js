@@ -672,50 +672,50 @@ function vPrep() {
 
 // ===== 🧪 추후 과제 — 지금은 만들지 않고, 나중에 추가 요청할 때 쓸 프롬프트를 모아 둠 =====
 const LATER = [
-  { id: 'resume', icon: '📄', t: '이력서·경력기술서·포트폴리오 만들기', why: '지금은 자소서만 만들 수 있어요. 서류 전체를 한 곳에서 만들게 해요.',
-    where: ['**두 곳에 나눠서** 넣는 걸 추천해요.', '① 3. 지원하고 준비하기 → 📝 서류 준비 맨 위 "내 기본 서류": 이력서·경력기술서·포트폴리오를 내 정보·경험·나 알아가기에서 가져와 **한 번** 만들어요. (회사가 달라도 내용 대부분은 같아서, 공고마다 새로 만들면 낭비예요.)', '② 서류 준비의 각 공고 카드 안 "이 공고용으로 맞추기": 기본 서류에서 필수·우대·직무에 맞게 **강조 순서만** 바꿔요. 없는 경험은 넣지 않아요.', '③ 완성한 파일은 📋 지원서 입력의 첨부 칸(이력서·경력기술서·포트폴리오)과 연결해요.'],
-    prompt: `[기능 추가 요청] 채용 보드에 "이력서·경력기술서·포트폴리오 만들기"를 추가해 줘. (보드 URL에 같은 주소로 publish, 다른 코드는 건드리지 않기, 기존 데이터 유지)
+  { id: 'immersive_interview', icon: '🎬', t: '실사형 다인 면접 시뮬레이터',
+    why: '실제 사람처럼 보이는 여러 면접관과 음성으로 대화하고, 다른 지원자의 답변까지 들으며 실제 면접 흐름을 연습해요.',
+    where: [
+      '**준비 → AI 모의면접**에 실전 시뮬레이션 모드를 추가해요. 지금 있는 질문·타이머·음성 기능은 유지해요.',
+      '질문 근거는 **내 자소서·이력서·포트폴리오**, 지원 공고의 요구사항, **수집해 둔 면접 후기·질문**에서 고릅니다. 각 질문에 사용한 자료와 확인할 문장을 표시해요.',
+      '**지원자 1명 : 면접관 2명(1:2)**, **지원자 2명 : 면접관 3명(2:3)** 등을 선택해요. 다른 지원자도 말하고, 면접관들이 번갈아 질문·꼬리질문을 해요.',
+      '실사형 얼굴·입 모양·시선과 서로 구분되는 목소리를 넣되, 실제 사람처럼 보이는 화면은 사용 권한이 확인된 자료로 만들어요. 구현 단계와 평가 기준은 아래 개발 요청문에 적어 둡니다.'
+    ],
+    prompt: `[개발 요청] 채용보드의 기존 AI 모의면접을 "실사형 다인 면접 시뮬레이터"로 확장해 줘. 현재 모의면접, 개인 기록, 지원 현황은 유지하고 새 모드는 선택해서 시작하게 해 줘.
 
-구조
-1) 📝 서류 준비 맨 위에 "내 기본 서류" 카드: 내 정보(UPROF)·내 기준/경험(PF.v.have)·나 알아가기·상담사 '나' 탭 기록을 읽어 이력서, 경력기술서, 포트폴리오 구성안의 초안을 만든다. 한 번 만들고 계속 고친다.
-2) 서류 준비의 각 공고 카드 안에 "이 공고용으로 맞추기" 버튼: 기본 서류에서 그 공고의 필수·우대·직무에 맞게 항목 순서와 강조만 바꾼 버전을 만든다. 기본 서류에 없는 경험은 절대 추가하지 않는다.
-3) 만든 결과는 📋 지원서 입력의 첨부 칸과 연결하고, 복사·.txt/.md 저장(downloads)을 지원한다.
-4) 포트폴리오는 프로젝트별 한 장 요약(문제·내가 한 일·결과·배운 점·링크)과 전체 목차까지만 만든다. 디자인 파일은 만들지 않는다.
+목표
+- 실제 사람처럼 보이는 면접관 여러 명과 음성으로 대화하고, 답변을 듣고 반응하는 면접을 연습한다.
+- 사용자가 선택한 자소서·이력서·포트폴리오의 문장과 기술, 관심 공고의 필수·우대·직무, 수집한 면접 후기·질문을 근거로 질문한다. 문서에 없는 경력이나 프로젝트 성과는 지어내지 않는다.
+- 1:2는 지원자 1명·면접관 2명, 2:3은 지원자 2명·면접관 3명으로 명시한다. 다른 지원자는 시뮬레이션 인물이며 실제 사람이 아니다.
 
-규칙
-- 사실만 쓴다. 숫자·기간·성과를 지어내지 않는다. 근거가 없는 줄에는 ⚠️ 근거 필요 표시를 붙인다.
-- 팀원이 한 일은 내 것으로 쓰지 않는다(내 역할만).
-- 주민등록번호·여권번호·연봉은 저장하지 않는다. 개인정보는 내 계정 문서(udSet)에만 두고 DATA에는 넣지 않는다.
-- AI 호출은 기존 aiSample/aiErrMsg 흐름을 쓰고, 실패해도 직접 편집은 가능해야 한다.
-- 모바일 390px에서 가로 넘침이 없어야 한다. 끝나면 회귀 테스트 후 publish.` },
-  { id: 'multiai', icon: '🔀', t: '여러 AI로 실행하기', why: '지금은 Claude에서 열었을 때만 AI 기능이 돼요. 다른 AI도 쓸 수 있게 해요.',
-    where: ['**1단계(키 없이, 먼저)**: 보드가 만든 프롬프트를 복사 → ChatGPT·Gemini 같은 다른 AI에 붙여 넣기 → 받은 답을 보드에 붙여 넣으면 같은 화면에 반영돼요. 키가 필요 없고 안전해요.', '**2단계(선택)**: 내가 직접 넣은 API 키로 보드가 바로 호출해요. 키는 저장하지 않고 이번 접속 동안만 메모리에 둬요. 브라우저에서 막히는 곳은 1단계만 써요.', '설정은 ⚙️ 내 계정 안에 "AI 선택(Claude / 복사해서 다른 AI)"로 둬요.'],
-    prompt: `[기능 추가 요청] 채용 보드의 AI 호출을 여러 AI로 쓸 수 있게 바꿔 줘. (같은 URL에 publish, 기존 기능과 데이터 유지)
+대화 흐름
+1) 시작 전에 회사·직무·면접 단계·시간·인원과 사용할 자료를 고른다. 자료의 누락·오래된 내용은 확인할 수 있게 한다.
+2) 면접관마다 역할(인사·직무·기술 등)과 목소리를 구분하고, 화면에서 지금 말하는 사람이 누구인지 명확하게 표시한다. 실제 사람처럼 보이는 얼굴·입 모양·시선은 음성과 맞춘다.
+3) 음성 질문 → 사용자 음성 인식 → 답변 확인 → 답변 내용에 맞는 꼬리질문으로 진행한다. 말이 끊기거나 인식이 틀리면 사용자가 고쳐서 계속할 수 있어야 한다.
+4) 자소서의 주장과 포트폴리오의 설계·구현·사용 기술을 구체적으로 검증한다. 후기에서 나온 질문은 실제 후기인지 예상 질문인지 구분하고 출처를 표시한다.
+5) 다인 모드에서는 다른 지원자의 발언을 들을 수 있고, 내 차례·대기·공통 질문·개별 질문·다른 답변을 들은 뒤의 추가 질문을 연습한다. 면접관끼리 역할을 나눠 번갈아 질문하고, 사용자가 다른 사람의 답변을 반복하지 않고 자신의 근거로 답하도록 돕는다.
+6) 면접 후 질문·답변·음성 인식 원문·사용한 자료·근거 문장·면접관별 평가와 놓친 질문을 검토한다. 잘못 인식된 말이나 잘못 연결된 근거는 사용자가 수정할 수 있어야 한다.
 
-1단계 — 키 없는 "복사·붙여넣기" 모드
-- 지금 AI를 부르는 모든 곳(상담사 대화·판정, 모의면접·AI 모의면접, 자소서/면접 첨삭, AI 읽기, 공부 추천)을 하나의 함수 aiCall(kind, prompt, jsonSchema)로 모은다.
-- provider 설정: "claude"(기본, 지금 방식) | "copy"(프롬프트를 보여 주고 복사 → 다른 AI의 답을 붙여 넣는 칸 → JSON 검증 후 같은 화면에 반영). 선택값은 내 계정 설정(udSet)에 저장한다.
-- 붙여 넣은 답이 JSON 형식이 아니면 이유를 알려 주고 "다시 붙여 넣기"를 보여 준다(자동 반복 호출 없음).
+구현·검증 순서
+- 먼저 텍스트 대화와 음성 인식으로 1:1 대화·자료 근거·꼬리질문·기록을 검증한다.
+- 다음으로 면접관 2명과 지원자 2명 시나리오의 차례 전환, 동시 발언, 끼어들기, 대기 시간을 시험한다.
+- 마지막으로 실사형 표현과 음성·입 모양 동기화를 넣고 지연 시간, 자막 정확도, 사용 비용, 모바일·PC 성능을 비교한다.
+- 시험용 자소서·포트폴리오·후기와 예상 질문/근거 정답군을 먼저 정하고, 질문의 출처 정확성·음성 인식 오류·차례 전환 오류·영상 지연을 각각 측정한다. 기준을 못 채운 단계는 수정한 뒤 다음 단계로 간다.
 
-2단계(선택) — 내 API 키로 직접 호출
-- 키는 화면에서 사용자가 직접 입력만 하고, localStorage·문서·DATA·URL 어디에도 저장하지 않는다(이번 접속 메모리에만). 브라우저에서 CORS로 막히는 곳은 지원하지 않고 1단계만 안내한다.
-- 호출 비용은 사용자 본인 키에서 나간다는 안내를 보여 준다.
-
-공통 규칙: AI가 지어내지 않게 지금의 프롬프트 규칙(사실만, 팀원 일은 내 것으로 쓰지 않기)을 provider와 무관하게 그대로 붙인다. 끝나면 회귀 테스트 후 publish.` }
+개인 자소서·포트폴리오·녹음은 사용자 계정 권한 안에서만 사용하고 공개 데이터에 넣지 않는다. 녹음·영상 보관 여부와 삭제 방법을 사용자에게 명확히 제공한다. 실사형 인물 자료는 사용 권한을 확인한다.` }
 ];
 const LATER_ST = (() => { try { return JSON.parse(store.get('later', '{}')) || {}; } catch { return {}; } })();
 function vLater() {
   const stL = { '': ['🕒 나중에', ''], asked: ['📨 요청함', 'mid'], done: ['✅ 추가됨', 'high'] };
   const md = t => esc(t).replace(/\*\*(.+?)\*\*/g, '<b>$1</b>');
-  $('#view').innerHTML = `<p class="lead">지금은 만들지 않고, <b>나중에 추가할 기능</b>을 모아 둔 곳이에요. 각 카드의 <b>📋 추가 요청 프롬프트 복사</b>를 누르면 요청 문장이 복사돼요. Claude 채팅에 붙여 넣으면 그 기능을 추가해 줘요.</p>
+  $('#view').innerHTML = `<p class="lead">현재 AI 모의면접을 확장할 <b>개발 계획</b>이에요. 실사형 면접관과 다인 대화는 아직 구현 전입니다. 아래에서 목표·구현 순서·검증 기준을 확인하고 개발 요청문을 복사할 수 있어요.</p>
     ${LATER.map(x => { const cur = LATER_ST[x.id] || ''; return `<details class="card" open><summary class="solo"><div class="head"><div class="co">${x.icon} ${esc(x.t)}<span class="pill ${stL[cur][1]}">${stL[cur][0]}</span></div><div class="role">${esc(x.why)}</div></div></summary>
-      <div class="body"><h3>어디에 넣을까</h3><ul>${x.where.map(w => `<li>${md(w)}</li>`).join('')}</ul>
-        <h3>추가 요청 프롬프트</h3><pre class="later-pre">${esc(x.prompt)}</pre>
-        <div class="tags" style="margin-top:8px"><button type="button" class="mk-btn pri" data-lcopy="${x.id}">📋 추가 요청 프롬프트 복사</button>
+      <div class="body"><h3>구현 위치와 핵심 요구</h3><ul>${x.where.map(w => `<li>${md(w)}</li>`).join('')}</ul>
+        <h3>개발 요청문</h3><pre class="later-pre">${esc(x.prompt)}</pre>
+        <div class="tags" style="margin-top:8px"><button type="button" class="mk-btn pri" data-lcopy="${x.id}">📋 개발 요청문 복사</button>
           <select data-lst="${x.id}" aria-label="상태">${Object.entries(stL).map(([k, [t]]) => `<option value="${k}" ${k === cur ? 'selected' : ''}>${t}</option>`).join('')}</select></div>
         <p class="note" data-lmsg="${x.id}"></p></div></details>`; }).join('')}
-    <p class="note">토큰이 충분할 때 요청하세요. 복사한 문장에는 규칙(사실만 쓰기, 개인정보 저장 금지 등)이 이미 들어 있어요.</p>`;
-  document.querySelectorAll('[data-lcopy]').forEach(b => b.onclick = async () => { const x = LATER.find(y => y.id === b.dataset.lcopy), m = document.querySelector(`[data-lmsg="${x.id}"]`); try { await navigator.clipboard.writeText(x.prompt); m.textContent = '📋 복사했어요 → Claude 채팅에 붙여 넣어 보내 주세요.'; if (!LATER_ST[x.id]) { LATER_ST[x.id] = 'asked'; store.set('later', JSON.stringify(LATER_ST)); const se = document.querySelector(`[data-lst="${x.id}"]`); if (se) se.value = 'asked'; } } catch { m.textContent = '복사가 막혔어요. 아래 글을 직접 선택해 복사해 주세요.'; } });
+    <p class="note">개발 요청문은 기획 초안입니다. 단계별 시험 결과에 따라 기능과 평가 기준을 보완해 주세요.</p>`;
+  document.querySelectorAll('[data-lcopy]').forEach(b => b.onclick = async () => { const x = LATER.find(y => y.id === b.dataset.lcopy), m = document.querySelector(`[data-lmsg="${x.id}"]`); try { await navigator.clipboard.writeText(x.prompt); m.textContent = '📋 개발 요청문을 복사했어요.'; if (!LATER_ST[x.id]) { LATER_ST[x.id] = 'asked'; store.set('later', JSON.stringify(LATER_ST)); const se = document.querySelector(`[data-lst="${x.id}"]`); if (se) se.value = 'asked'; } } catch { m.textContent = '복사가 막혔어요. 아래 글을 직접 선택해 복사해 주세요.'; } });
   document.querySelectorAll('[data-lst]').forEach(sel => sel.onchange = () => { LATER_ST[sel.dataset.lst] = sel.value; store.set('later', JSON.stringify(LATER_ST)); vLater(); });
 }
 /* ===== 모의면접 (회사 선택 → 질문 → 타이머 → AI 면접관) ===== */
