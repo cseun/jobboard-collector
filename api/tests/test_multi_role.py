@@ -21,12 +21,13 @@ def test_target_filter_is_conservative():
 
 def test_split_creates_independent_jobs_and_keeps_parent(client):
     with SessionLocal() as db:
-        parent = Job(source_key="https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=55598173",
-                     company="셀트리온제약", title="신입/경력 수시채용", location="충북", status="마감",
+        parent = Job(source_key="https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=99999999",
+                     company="테스트회사", title="신입/경력 수시채용", location="충북", status="마감",
                      deadline_text="11/25", deadline_date=date(2026, 11, 25),
-                     raw={"기업명": "셀트리온제약", "공고명·담당 업무": "신입/경력 수시채용",
-                          "원문 URL": "[사람인](https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=55598173)",
-                          "필수": "", "우대": ""})
+                     first_seen=date(2026, 11, 24),
+                     raw={"기업명": "테스트회사", "공고명·담당 업무": "신입/경력 수시채용",
+                          "원문 URL": "[사람인](https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=99999999)",
+                          "원문 본문": "원본 OCR 본문", "필수": "", "우대": ""})
         db.add(parent)
         db.commit()
         payload = {"parent_source_key": parent.source_key,
@@ -43,6 +44,8 @@ def test_split_creates_independent_jobs_and_keeps_parent(client):
         assert rows[1].source_key != rows[2].source_key
         assert rows[1].raw["필수"] == "- ROS 경험"
         assert rows[2].raw["필수"] == "- PLC 개발"
+        assert all(j.raw["원문 본문"] == "원본 OCR 본문" for j in rows[1:])
+        assert all(j.first_seen == date(2026, 11, 24) for j in rows[1:])
         assert audit(rows)["total"] == 2
         import_roles(db, payload, apply=True)
         assert len(db.execute(select(Job)).scalars().all()) == 3

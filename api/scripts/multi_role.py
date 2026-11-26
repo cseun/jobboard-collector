@@ -85,8 +85,9 @@ def import_roles(db, payload: dict, apply: bool = False) -> dict:
         raw.pop("합본 공고 표시", None)
         raw.update({"공고명·담당 업무": title, "직무별 공고 키": key, "합본 공고 키": parent.source_key, "합본 공고명": parent.title,
                     "직무 분할 출처": "원문 확인 JSON", "필수·우대 출처": "직무별 원문 확인 JSON",
-                    "필수": _lines(role.get("required")), "우대": _lines(role.get("preferred")),
-                    "원문 본문": _lines(role.get("source_text"))})
+                    "필수": _lines(role.get("required")), "우대": _lines(role.get("preferred"))})
+        if role.get("source_text"):
+            raw["원문 본문"] = _lines(role["source_text"])
         raw.pop("AI 읽은 날", None)
         if role.get("tasks"):
             raw["담당 업무"] = _lines(role["tasks"])
@@ -107,7 +108,8 @@ def import_roles(db, payload: dict, apply: bool = False) -> dict:
                 db.add(Job(source_key=key, company=parent.company, title=raw["공고명·담당 업무"],
                            location=raw["근무 위치"], status=parent.status, deadline_text=parent.deadline_text,
                            deadline_date=parent.deadline_date, deadline_time=parent.deadline_time,
-                           last_checked=parent.last_checked, raw=raw))
+                           last_checked=parent.last_checked, posted_date=parent.posted_date,
+                           first_seen=parent.first_seen, raw=raw))
         if planned:
             base = dict(parent.raw or {})
             base["직무별 공고 키"] = [key for key, _, _ in planned]
