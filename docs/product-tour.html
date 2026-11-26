@@ -1,0 +1,124 @@
+<!doctype html>
+<html lang="ko">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>채용보드 화면 안내</title>
+  <style>
+    :root { color-scheme: light; font-family: system-ui, -apple-system, "Malgun Gothic", sans-serif; color: #17223f; background: #eef1ff; }
+    * { box-sizing: border-box; }
+    body { margin: 0; }
+    button { font: inherit; cursor: pointer; }
+    .shell { max-width: 1480px; margin: auto; padding: 24px; }
+    header { display: flex; align-items: center; justify-content: space-between; gap: 20px; margin-bottom: 18px; }
+    h1 { font-size: clamp(1.4rem, 2.5vw, 2rem); margin: 0; }
+    header p { color: #62708f; margin: 6px 0 0; }
+    .back { color: #465fe9; text-decoration: none; font-weight: 700; white-space: nowrap; }
+    .stage { display: grid; grid-template-columns: minmax(260px, .7fr) minmax(0, 2fr); gap: 18px; align-items: stretch; }
+    .panel, .imagebox { background: white; border-radius: 20px; box-shadow: 0 10px 30px #5665ad16; overflow: hidden; }
+    .panel { padding: clamp(22px, 3vw, 36px); display: flex; flex-direction: column; min-height: 380px; }
+    .eyebrow { color: #526df2; font-weight: 800; letter-spacing: .04em; font-size: .85rem; }
+    h2 { font-size: clamp(1.45rem, 2.2vw, 2.2rem); line-height: 1.25; margin: 18px 0 12px; }
+    .path { display: inline-block; width: fit-content; padding: 7px 12px; border-radius: 999px; background: #edf0ff; color: #3b52cb; font-size: .85rem; font-weight: 700; }
+    .summary { font-size: 1.05rem; line-height: 1.65; margin: 22px 0 4px; }
+    ul { line-height: 1.7; padding-left: 1.2em; color: #43516e; }
+    li { margin: 7px 0; }
+    .note { margin-top: auto; padding-top: 20px; color: #73809c; font-size: .85rem; }
+    .imagebox { display: flex; align-items: center; justify-content: center; min-height: 420px; background: #dde4fb; }
+    .imagebox img { display: block; width: 100%; height: auto; max-height: min(72vh, 760px); object-fit: contain; }
+    .controls { display: flex; align-items: center; gap: 10px; margin-top: 18px; }
+    .controls button { border: 1px solid #cbd3f0; border-radius: 12px; padding: 10px 18px; color: #3447a0; background: white; font-weight: 700; }
+    .controls button:hover, .controls button:focus-visible { border-color: #526df2; outline: 2px solid #526df255; }
+    #next { color: white; background: #526df2; border-color: #526df2; }
+    #next:hover { background: #3d58dc; }
+    .counter { margin-left: auto; color: #53617d; font-weight: 700; white-space: nowrap; }
+    .progress { height: 6px; background: #dce2f8; border-radius: 6px; margin: 15px 0 20px; overflow: hidden; }
+    .progress span { display: block; height: 100%; background: #526df2; transition: width .2s ease; }
+    nav { display: flex; gap: 8px; overflow-x: auto; padding-bottom: 8px; }
+    nav button { white-space: nowrap; border: 1px solid #cbd3f0; border-radius: 999px; background: #fff; padding: 9px 13px; color: #43516e; }
+    nav button[aria-current="step"] { color: #fff; background: #526df2; border-color: #526df2; }
+    .foot { font-size: .85rem; color: #62708f; line-height: 1.6; margin-top: 16px; }
+    @media (max-width: 850px) { .stage { grid-template-columns: 1fr; } .panel { min-height: 0; } .imagebox { min-height: 0; } header { align-items: flex-start; } }
+  </style>
+</head>
+<body>
+  <main class="shell">
+    <header>
+      <div><h1>채용보드 화면 안내</h1><p>화면을 넘기며 메뉴와 사용 순서를 살펴보세요.</p></div>
+      <a class="back" href="../README.md">README로 돌아가기</a>
+    </header>
+    <div class="controls">
+      <button id="previous" type="button" aria-label="이전 화면">← 이전</button>
+      <button id="next" type="button" aria-label="다음 화면">다음 →</button>
+      <span class="counter" id="counter"></span>
+    </div>
+    <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+    <div class="stage" aria-live="polite">
+      <section class="panel">
+        <div class="eyebrow" id="chapter"></div>
+        <h2 id="title"></h2>
+        <span class="path" id="path"></span>
+        <p class="summary" id="summary"></p>
+        <ul id="points"></ul>
+        <p class="note">예시 화면입니다. 공고 수, 날짜와 진행률은 계정 및 수집 시점에 따라 달라집니다.</p>
+      </section>
+      <div class="imagebox"><img id="screen" alt="" loading="eager"></div>
+    </div>
+    <nav id="slides" aria-label="화면 선택"></nav>
+    <p class="foot">← → 방향키로도 이동할 수 있습니다. 이 안내는 실제 채용보드와 별개인 정적 파일이며, 화면에서 저장하거나 지원서를 제출하지 않습니다.</p>
+  </main>
+  <script>
+    const slides = [
+      { chapter: '01 · 홈', title: '대시보드', path: '홈 › 대시보드', image: 'dashboard.png', summary: '성장 진행률, 최근 활동, 이번 주 계획과 다음 할 일을 한 화면에서 봅니다.', points: ['시작 가이드·나 이해·면접 준비·프로젝트 이해도의 진행률을 확인합니다.', '오늘 할 일과 관심 공고의 마감 정보를 빠르게 확인합니다.'] },
+      { chapter: '02 · 홈', title: '시작 가이드', path: '홈 › 시작 가이드', image: 'start-guide.png', summary: '프로필, 가진 것, 경력, 원하는 조건과 수집 설정을 순서대로 채웁니다.', points: ['입력한 내 정보는 공고 비교와 서류 준비에 연결됩니다.', '완료한 항목은 다시 열어 수정할 수 있습니다.'] },
+      { chapter: '03 · 홈', title: '오늘 할 일', path: '홈 › 오늘 할 일', image: 'today.png', summary: '하루 단위의 준비 과제를 보고 완료 여부를 기록합니다.', points: ['날짜를 바꾸어 이전·다음 할 일을 볼 수 있습니다.', '반복 일정과 제안된 할 일을 관리할 수 있습니다.'] },
+      { chapter: '04 · 나', title: '나 알아가기', path: '나 › 나 알아가기', image: 'self-overview.png', summary: '경험과 선호를 짧은 질문에 기록하고 자신에게 맞는 직무를 탐색합니다.', points: ['기본 좋았던 순간, 에너지 패턴, 강점과 가치관을 단계별로 정리합니다.', '기록은 내 정보와 상담에 활용할 수 있습니다.'] },
+      { chapter: '05 · 나', title: '직무 이해', path: '나 › 직무 이해·나의 정의', image: 'role-study.png', summary: '관심 직무가 실제로 하는 일과 필요한 도구·기술을 살펴봅니다.', points: ['직무와 분야별 설명을 확인합니다.', '관찰하거나 직접 해 본 내용을 메모해 직무 선택의 근거로 씁니다.'] },
+      { chapter: '06 · 준비', title: '서류 준비', path: '준비 › 서류 준비', image: 'documents.png', summary: '관심 공고의 조건을 확인하고 공고마다 준비 상태를 기록합니다.', points: ['원문, 준비 공간과 서류 자료를 공고 단위로 엽니다.', '실제 지원은 채용 사이트에서 하며, 보드에는 지원 상태를 기록합니다.'] },
+      { chapter: '07 · 매니저', title: '공고별 준비', path: '매니저 › 공고별 준비', image: 'posting-prep.png', summary: '공고 요구사항과 내 경험을 비교해 지원에 필요한 근거를 정리합니다.', points: ['분석·서류·면접·프로젝트·계획/할 일 탭으로 이어집니다.', '필수·우대 요건마다 경험과 다음 행동을 기록합니다.'] },
+      { chapter: '08 · 준비', title: '모의면접', path: '준비 › 모의면접', image: 'mock-interview.png', summary: '회사와 질문을 골라 답변 시간을 재며 면접을 연습합니다.', points: ['질문 듣기, 답변 시작·정지, 이전·다음 질문 이동이 가능합니다.', '말하거나 입력한 답변을 점검하고 기록합니다.'] },
+      { chapter: '09 · 준비', title: '면접 질문 목록', path: '준비 › 모의면접 › 질문 목록', image: 'interview-questions.png', summary: '질문을 목록으로 훑고 답변 여부를 확인합니다.', points: ['질문을 눌러 해당 문항으로 이동합니다.', 'AI 모의면접 메뉴에서는 전형 전체를 별도로 연습합니다.'] }
+    ];
+    const $ = id => document.getElementById(id);
+    const params = new URLSearchParams(location.search);
+    let index = Math.max(0, Math.min(slides.length - 1, Number(params.get('slide')) - 1 || 0));
+    const navigation = $('slides');
+    slides.forEach((slide, i) => {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.textContent = slide.title;
+      button.addEventListener('click', () => show(i));
+      navigation.append(button);
+    });
+    function show(i) {
+      index = Math.max(0, Math.min(slides.length - 1, i));
+      const slide = slides[index];
+      $('chapter').textContent = slide.chapter;
+      $('title').textContent = slide.title;
+      $('path').textContent = slide.path;
+      $('summary').textContent = slide.summary;
+      $('points').replaceChildren(...slide.points.map(point => {
+        const li = document.createElement('li'); li.textContent = point; return li;
+      }));
+      $('screen').src = 'tour-images/' + slide.image;
+      $('screen').alt = slide.title + ' 화면 예시';
+      $('counter').textContent = `${index + 1} / ${slides.length}`;
+      $('progress').style.width = `${(index + 1) / slides.length * 100}%`;
+      $('previous').disabled = index === 0;
+      $('next').disabled = index === slides.length - 1;
+      [...navigation.children].forEach((button, position) => {
+        if (position === index) button.setAttribute('aria-current', 'step');
+        else button.removeAttribute('aria-current');
+      });
+      try { history.replaceState(null, '', '?slide=' + (index + 1)); } catch {}
+    }
+    $('previous').addEventListener('click', () => show(index - 1));
+    $('next').addEventListener('click', () => show(index + 1));
+    document.addEventListener('keydown', event => {
+      if (event.key === 'ArrowLeft') show(index - 1);
+      if (event.key === 'ArrowRight') show(index + 1);
+    });
+    show(index);
+  </script>
+</body>
+</html>
