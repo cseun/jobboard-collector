@@ -12,6 +12,8 @@ from scripts.requirements_audit import audit
 def test_target_filter_is_conservative():
     assert relevant("로봇 SW 개발")
     assert relevant("AI·LLM 엔지니어")
+    assert relevant("AI Enablement")
+    assert not relevant("AI Scientist [약물설계]")
     assert not relevant("AI 마케팅")
     assert not relevant("웹 백엔드 개발")
     assert not relevant("품질관리")

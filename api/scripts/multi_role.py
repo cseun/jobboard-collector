@@ -27,7 +27,7 @@ TARGET = re.compile(
     r"소프트웨어\s*검증|\bAI\b|LLM|RAG|인공지능|생성형|AX\s*엔지니어|MES|스마트\s*팩토리|자율주행",
     re.I,
 )
-EXCLUDE = re.compile(r"영업|마케팅|회계|인사|총무|구매|약사|생산직|포장|품질관리|기계\s*설계|전기\s*설계|웹\s*개발|프론트|백엔드", re.I)
+EXCLUDE = re.compile(r"영업|마케팅|회계|인사|총무|구매|약사|약물|신약|항체|단백질|Scientist|생산직|포장|품질관리|기계\s*설계|전기\s*설계|웹\s*개발|프론트|백엔드", re.I)
 
 
 def relevant(title: str) -> bool:
