@@ -2082,7 +2082,11 @@ function haveFromProfile2() {
   PFIMP = notes.join(' · '); pfSave(); return n;
 }
 // --- 계정 영역(프로필 버튼) ---
-const acctBar = cur => `<div class="seg acct-bar" role="tablist">${[['me', '📄 내 정보'], ['ak', '📋 지원서 입력'], ['pf', '🎯 내 기준'], ['col', '📡 수집 설정'], ['set', '⚙️ 설정·백업']].map(([k, t]) => `<button data-acct="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>`;
+const acctBar = cur => {
+  const items = ['me', 'pf'].includes(cur) ? [['me', '📄 내 정보'], ['pf', '🎯 내 기준']]
+    : ['col', 'set'].includes(cur) ? [['col', '📡 수집 설정'], ['set', '⚙️ 설정·백업']] : [];
+  return items.length ? `<div class="seg acct-bar" role="tablist">${items.map(([k, t]) => `<button data-acct="${k}" aria-pressed="${cur === k}">${t}</button>`).join('')}</div>` : '';
+};
 document.addEventListener('click', e => { const b = e.target.closest('[data-acct]'); if (b) { e.preventDefault(); show(b.dataset.acct); } });
 const PF_OPEN = new Set(['pf-have-tech']);
 function vPf() {
@@ -5175,9 +5179,9 @@ const SIDE = [
   ['jobs', '🔍', '공고', [['domestic', '국내 공고', 'n-domestic', '접수 중'], ['picks', '추천', 'n-picks', '추천 선정'], ['overseas', '해외 후보', 'n-overseas', '접수 중'], ['near', '내 주변 회사']]],
   ['co', '🏢', '회사', [['cos', '회사 정보'], ['cmp', '회사 비교', 'n-cmp', '곳'], ['interview', '면접 후기', 'n-interview', '곳']]],
   ['apply', '📨', '지원', [['apps', '지원 현황', 'n-apps', '진행']]],
-  ['ready', '📝', '준비', [['docs', '서류 준비'], ['resume', '이력서·포트폴리오'], ['mock', '모의면접'], ['aiiv', 'AI 모의면접'], ['proj', '프로젝트 점검'], ['prep', '역량 준비'], ['lib', '자료실', 'n-lib', '개']]],
-  ['self', '🌱', '나', [['self', '나 알아가기'], ['learn', '직무 이해·나의 정의']]],
-  ['cfg', '⚙️', '내 설정', [['me', '내 정보'], ['ak', '지원서 입력'], ['pf', '내 기준'], ['col', '수집 설정'], ['set', '설정·백업'], ...(POOL_ON ? [['contrib', '공고 기여하기']] : []), ['later', '추후 과제'], ['help', '도움말 · 의견']]]
+  ['ready', '📝', '준비', [['docs', '서류 준비'], ['resume', '이력서·포트폴리오'], ['ak', '지원서 입력'], ['mock', '모의면접'], ['aiiv', 'AI 모의면접'], ['proj', '프로젝트 점검'], ['prep', '역량 준비'], ['lib', '자료실', 'n-lib', '개']]],
+  ['self', '🌱', '나', [['self', '나 알아가기'], ['learn', '직무 이해·나의 정의'], ['me', '내 정보'], ['pf', '내 기준']]],
+  ['cfg', '⚙️', '내 설정', [['col', '수집 설정'], ['set', '설정·백업'], ...(POOL_ON ? [['contrib', '공고 기여하기']] : []), ['later', '추후 과제'], ['help', '도움말 · 의견']]]
 ];
 const SIDE_LABEL = Object.fromEntries(SIDE.flatMap(([, , , L]) => L.map(([v, t]) => [v, t]))); SIDE_LABEL.poolmod = '🛡️ 기여 승인'; SIDE_LABEL.set = '⚙️ 설정·백업';
 function sideRender() {
@@ -6171,9 +6175,9 @@ function show(v, nm) {
   show.cur = v;
   if (v !== 'mock') mockCleanup();
   if (v !== 'aiiv') { try { aiStopAll(); } catch {} }
-  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v || (b.dataset.view === 'me' && ['ak', 'pf', 'col', 'set'].includes(v))));
+  document.querySelectorAll('nav.tabs button').forEach(b => b.setAttribute('aria-selected', b.dataset.view === v));
   navGroup(v); sideSync(v);
-  try { $('#acctBtn').setAttribute('aria-pressed', ['me', 'ak', 'pf', 'col', 'set'].includes(v)); $('#helpBtn').setAttribute('aria-pressed', v === 'help'); } catch {}
+  try { $('#acctBtn').setAttribute('aria-pressed', ['me', 'pf'].includes(v)); $('#helpBtn').setAttribute('aria-pressed', v === 'help'); } catch {}
   acctAvatar();
   try { history.replaceState(null, '', '#' + v); } catch {}
   VIEWS[v](); window.scrollTo(0, 0);
@@ -6198,7 +6202,7 @@ try { $('#n-cmp').textContent = cmpRows().length; } catch {}
 $('#n-apps').textContent = apps.filter(appActive).length;
 $('#n-overseas').textContent = overseas.filter(o => o.g !== '제외').length;
 $('#n-interview').textContent = interviews.length;
-const NAV_GRP = { home: ['week', 'guide', 'todo'], mgr: ['career', 'ws', 'coach'], jobs: ['domestic', 'picks', 'overseas', 'near'], co: ['cos', 'cmp', 'interview'], apply: ['apps'], ready: ['docs', 'resume', 'mock', 'aiiv', 'proj', 'prep', 'lib'], self: ['self', 'learn'], cfg: ['me', 'ak', 'pf', 'col', 'set', 'contrib', 'later', 'help'] };
+const NAV_GRP = { home: ['week', 'guide', 'todo'], mgr: ['career', 'ws', 'coach'], jobs: ['domestic', 'picks', 'overseas', 'near'], co: ['cos', 'cmp', 'interview'], apply: ['apps'], ready: ['docs', 'resume', 'ak', 'mock', 'aiiv', 'proj', 'prep', 'lib'], self: ['self', 'learn', 'me', 'pf'], cfg: ['col', 'set', 'contrib', 'later', 'help'] };
 // ===== 🗂 공고별 준비 공간 — 분석(요구사항↔내 경험 대조·공고 상담) · 서류 · 면접 · 프로젝트 · 계획·할 일 =====
 const WS_ST = [['', '미확인'], ['ok', '근거 있음'], ['gap', '보완 필요'], ['none', '경험 없음']];
 const WS_FRAMES = [['evidence', '① 근거 보완'], ['revise', '② 기존 프로젝트 수정'], ['apply', '③ 바로 지원'], ['hold', '④ 보류']];
