@@ -1,0 +1,11 @@
+[
+  {
+    "id": "sample-001",
+    "posting_url": "https://example.com/posting/001",
+    "query": "로봇 소프트웨어",
+    "rank": 3,
+    "images": [
+      {"path": "C:/path/to/original-image.png"}
+    ]
+  }
+]

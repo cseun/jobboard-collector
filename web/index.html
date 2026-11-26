@@ -1,0 +1,85 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>채용 보드</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  body { max-width: 860px; margin: 0 auto; padding: 24px 16px; line-height: 1.5; }
+  h1 { font-size: 1.4rem; } h2 { font-size: 1.05rem; margin-top: 1.6rem; }
+  form, .card { border: 1px solid #8884; border-radius: 10px; padding: 14px; margin: 12px 0; }
+  label { display: block; font-size: .85rem; margin: 8px 0 2px; }
+  input, button { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #8886; }
+  input { width: 100%; box-sizing: border-box; }
+  button { cursor: pointer; margin-top: 10px; }
+  .row { display: flex; gap: 8px; align-items: center; } .row > input { flex: 1; }
+  .muted { color: #888; font-size: .85rem; } .err { color: #c0392b; min-height: 1.2em; }
+  .job { padding: 10px 0; border-bottom: 1px solid #8883; }
+  .job b { display: block; } a { color: inherit; }
+  .hide { display: none; }
+</style>
+</head>
+<body>
+<h1>📋 채용 보드</h1>
+
+<section id="auth">
+  <form id="loginForm">
+    <h2>로그인</h2>
+    <label>이메일<input name="email" type="email" autocomplete="username" required></label>
+    <label>비밀번호<input name="password" type="password" autocomplete="current-password" required></label>
+    <button>로그인</button>
+  </form>
+  <form id="regForm">
+    <h2>초대 코드로 가입</h2>
+    <label>초대 코드<input name="invite_code" required></label>
+    <label>이메일<input name="email" type="email" autocomplete="username" required></label>
+    <label>비밀번호 (10자 이상)<input name="password" type="password" minlength="10" autocomplete="new-password" required></label>
+    <button>가입</button>
+  </form>
+  <p id="authErr" class="err"></p>
+  <form id="demoForm" class="hide">
+    <h2>👀 가입 없이 둘러보기</h2>
+    <p class="muted">공고 목록과 화면을 체험해 볼 수 있는 임시 계정이에요. AI와 파일 올리기는 꺼져 있고, 시간이 지나면 입력한 내용이 지워져요.</p>
+    <button>데모로 둘러보기</button>
+  </form>
+</section>
+
+<script>
+const $ = (s) => document.querySelector(s);
+async function api(path, opts = {}) {
+  const res = await fetch(path, {
+    credentials: "same-origin",
+    headers: opts.body ? { "Content-Type": "application/json" } : {},
+    ...opts,
+    body: opts.body ? JSON.stringify(opts.body) : undefined,
+  });
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw new Error(typeof data.detail === "string" ? data.detail : "요청을 처리하지 못했습니다.");
+  return data;
+}
+const form = (el) => Object.fromEntries(new FormData(el));
+const go = () => location.replace("/board.html");
+
+// 이미 로그인돼 있으면 바로 보드로
+fetch("/api/me", { credentials: "same-origin" }).then((r) => { if (r.ok) go(); });
+
+$("#loginForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#authErr").textContent = "";
+  try { await api("/api/auth/login", { method: "POST", body: form(e.target) }); go(); }
+  catch (err) { $("#authErr").textContent = err.message; }
+});
+fetch("/api/public-config").then((r) => r.json()).then((c) => { if (c.demo) $("#demoForm").classList.remove("hide"); }).catch(() => {});
+$("#demoForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#authErr").textContent = "";
+  try { await api("/api/auth/demo", { method: "POST" }); go(); }
+  catch (err) { $("#authErr").textContent = err.message; }
+});
+$("#regForm").addEventListener("submit", async (e) => {
+  e.preventDefault(); $("#authErr").textContent = "";
+  try { await api("/api/auth/register", { method: "POST", body: form(e.target) }); go(); }
+  catch (err) { $("#authErr").textContent = err.message; }
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,4 @@
+{"links":{"next":"/api/chaos/search/v1/position?query=x&limit=20&offset=20","prev":null},"total_count":3,"data":[
+{"id":144230,"position":"임베디드 개발자(3년 이상)","company":{"name":"에스알브이포지셔닝"},"annual_from":3,"annual_to":5,"employment_type":"regular"},
+{"id":397093,"position":"로봇 SW 개발자","company":{"name":"로보틱스랩"},"annual_from":0,"annual_to":3,"employment_type":"regular"},
+{"id":387010,"position":"임베디드 책임 연구원","company":{"name":"시니어랩"},"annual_from":8,"annual_to":15,"employment_type":"regular"}]}

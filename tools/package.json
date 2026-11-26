@@ -1,0 +1,6 @@
+{
+  "name": "jobboard-tools",
+  "private": true,
+  "type": "module",
+  "dependencies": { "acorn": "^8.14.0" }
+}

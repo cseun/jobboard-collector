@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="ko">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>관리</title>
+<style>
+  :root { color-scheme: light dark; font-family: system-ui, "Apple SD Gothic Neo", "Noto Sans KR", sans-serif; }
+  body { max-width: 760px; margin: 0 auto; padding: 24px 16px; line-height: 1.5; }
+  h1 { font-size: 1.3rem; } h2 { font-size: 1.05rem; margin-top: 1.6rem; }
+  .card { border: 1px solid #8884; border-radius: 10px; padding: 14px; margin: 12px 0; }
+  input, button { font: inherit; padding: 8px 10px; border-radius: 8px; border: 1px solid #8886; }
+  input { box-sizing: border-box; } button { cursor: pointer; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; } .row > input { flex: 1; min-width: 160px; }
+  table { width: 100%; border-collapse: collapse; font-size: .9rem; } td, th { text-align: left; padding: 6px 4px; border-bottom: 1px solid #8883; }
+  .muted { color: #888; font-size: .85rem; } code { font-size: 1.05rem; letter-spacing: .08em; }
+</style>
+</head>
+<body>
+<h1>⚙️ 관리</h1><p><a href="/board.html">← 보드로</a></p>
+<div id="denied" class="card" hidden>관리자만 볼 수 있습니다.</div>
+<div id="panel" hidden>
+  <div class="card">
+    <b>초대 코드 만들기</b>
+    <div class="row" style="margin-top:8px"><input id="note" placeholder="메모(예: 면접관 홍길동)" maxlength="100"><button id="mk">만들기</button></div>
+    <p id="out" class="muted"></p>
+  </div>
+  <h2>초대 코드</h2><table id="invites"></table>
+  <h2>가입한 사용자</h2><table id="users"></table>
+</div>
+<script>
+const $ = (s) => document.querySelector(s);
+async function api(path, opts = {}) {
+  const res = await fetch(path, { credentials: "same-origin", headers: opts.json ? { "Content-Type": "application/json" } : {}, method: opts.method || "GET", body: opts.json ? JSON.stringify(opts.json) : undefined });
+  if (res.status === 204) return null;
+  const data = await res.json().catch(() => ({}));
+  if (!res.ok) throw Object.assign(new Error(data.detail || "요청 실패"), { status: res.status });
+  return data;
+}
+const cell = (tr, text) => { const td = document.createElement("td"); td.textContent = text ?? ""; tr.append(td); return td; };
+const fmt = (s) => (s ? String(s).replace("T", " ").slice(0, 16) : "-");
+
+async function refresh() {
+  const inv = await api("/api/admin/invites");
+  const t = $("#invites"); t.replaceChildren();
+  const head = t.insertRow(); ["코드", "메모", "만료", "상태", ""].forEach((h) => { const th = document.createElement("th"); th.textContent = h; head.append(th); });
+  for (const i of inv) {
+    const tr = t.insertRow();
+    const c = cell(tr, ""); const code = document.createElement("code"); code.textContent = i.code; c.append(code);
+    cell(tr, i.note); cell(tr, fmt(i.expires_at)); cell(tr, i.used ? "사용됨" : "미사용");
+    const act = cell(tr, "");
+    if (!i.used) { const b = document.createElement("button"); b.textContent = "삭제"; b.onclick = async () => { await api("/api/admin/invites/" + i.id, { method: "DELETE" }); refresh(); }; act.append(b); }
+  }
+  const us = await api("/api/admin/users");
+  const u = $("#users"); u.replaceChildren();
+  const h2 = u.insertRow(); ["이메일", "권한", "가입"].forEach((h) => { const th = document.createElement("th"); th.textContent = h; h2.append(th); });
+  for (const x of us) { const tr = u.insertRow(); cell(tr, x.email); cell(tr, x.is_admin ? "관리자" : "일반"); cell(tr, fmt(x.created_at)); }
+}
+$("#mk").onclick = async () => {
+  try {
+    const r = await api("/api/admin/invites", { method: "POST", json: { note: $("#note").value || null } });
+    $("#out").textContent = "코드: " + r.code + "  (7일 안에 1회 사용 가능)"; $("#note").value = ""; refresh();
+  } catch (e) { $("#out").textContent = e.message; }
+};
+(async () => {
+  try { await api("/api/admin/users"); $("#panel").hidden = false; refresh(); }
+  catch (e) { if (e.status === 401) location.replace("/"); else $("#denied").hidden = false; }
+})();
+</script>
+</body>
+</html>

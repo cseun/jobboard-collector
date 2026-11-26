@@ -1,0 +1,32 @@
+# DOMAIN=board.example.com 이면 Let's Encrypt 인증서를 자동 발급합니다.
+# DOMAIN=:80 이면 HTTP로만 동작합니다(테스트용, 이때 COOKIE_SECURE=false 필요).
+{$DOMAIN:localhost} {
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy same-origin
+		-Server
+	}
+
+	handle /api/* {
+		reverse_proxy api:8000
+	}
+
+	# 업로드한 파일 보기·받기(보드 코드가 /_blob/<id> 로 요청함)
+	handle /_blob/* {
+		reverse_proxy api:8000
+	}
+
+	# 큰 업로드(20MB)를 위해 본문 크기 제한을 넉넉히
+	request_body {
+		max_size 25MB
+	}
+
+	handle {
+		root * /srv
+		try_files {path} /index.html
+		file_server
+	}
+}
