@@ -68,7 +68,7 @@ const trackPill = r => { const ts = tracksOf(r); if (!ts.length) return ''; cons
 const trackLine = r => { const ts = tracksOf(r); if (!ts.length) return '';
   return `<dt>부문별 학력</dt><dd>${ts.map(t => { const ok = trackOk(t), e = trackEdu(t['학력']); return `<div>${ok === true ? '✅' : ok === false ? '❌' : '▫️'} <b>${esc(plain(t['이름']))}</b> · ${esc(e === '학력 무관' ? '학력 무관' : e + ' 이상')}${t['비고'] ? `<br><span class="note">${esc(plain(t['비고']))}</span>` : ''}</div>`; }).join('')}${myEduLv() === null ? '<span class="note">🎯 내 기준에서 최종 학력을 고르면 지원 가능한 부문을 ✅로 보여줘요</span>' : ''}</dd>`; };
 const eduFlag = r => { const t = eduOf(r);
-  return /^석사 요건/.test(t) ? '<span class="pill bad">석사↑ 요건</span>' : /^박사 요건/.test(t) ? '<span class="pill bad">박사 요건</span>' : /^4년제 요건/.test(t) ? '<span class="pill mid">4년제 요건 · 확인 필요</span>' : /^초대졸 가능/.test(t) ? '<span class="pill high">초대졸 가능</span>'
+  return /^(석사 요건|석사 이상|석사 학위)/.test(t) ? '<span class="pill bad">석사↑ 요건</span>' : /^(박사 요건|박사 이상|박사 학위)/.test(t) ? '<span class="pill bad">박사 요건</span>' : /^(4년제 요건|4년제 이상|학사 이상|학사 학위|대졸 이상)/.test(t) ? '<span class="pill mid">4년제 요건 · 확인 필요</span>' : /^초대졸 가능/.test(t) ? '<span class="pill high">초대졸 가능</span>'
     : /^학력 무관/.test(t) ? '<span class="pill high">학력 무관</span>' : '<span class="pill">학력 미확인</span>'; };
 
 const jobMap = (r, i) => {
