@@ -1,5 +1,5 @@
 from fastapi import APIRouter, Depends, HTTPException, Query
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session as DBSession
 
 from ..db import get_db
@@ -26,6 +26,11 @@ def _summary(j: Job) -> dict:
     }
 
 
+def _visible(j: Job) -> bool:
+    """직무별로 분리한 합본은 보드 목록에서 중복 표시하지 않는다."""
+    return not (j.raw or {}).get("합본 공고 표시")
+
+
 @router.get("/jobs")
 def list_jobs(
     q: str | None = Query(default=None, max_length=100),
@@ -41,12 +46,12 @@ def list_jobs(
         stmt = stmt.where(or_(Job.company.ilike(like), Job.title.ilike(like)))
     if status:
         stmt = stmt.where(Job.status == status)
-    total = db.execute(select(func.count()).select_from(stmt.subquery())).scalar_one()
+    # 분리된 합본 여부는 JSON 원문에만 있으므로 필터 후 페이지를 자른다.
     order = {"id": [Job.id], "first_seen": [Job.first_seen.desc().nulls_last(), Job.id],       # 보드에 최근 들어온 순
              "posted": [Job.posted_date.desc().nulls_last(), Job.id],                       # 사이트에 최근 등록된 순
              "deadline": [Job.deadline_date.asc().nulls_last(), Job.id]}[sort]              # 마감 임박 순
-    rows = db.execute(stmt.order_by(*order).limit(limit).offset(offset)).scalars().all()
-    return {"total": total, "items": [_summary(r) for r in rows]}
+    visible = [r for r in db.execute(stmt.order_by(*order)).scalars() if _visible(r)]
+    return {"total": len(visible), "items": [_summary(r) for r in visible[offset:offset + limit]]}
 
 
 @router.get("/jobs/{job_id}")
@@ -60,7 +65,7 @@ def get_job(job_id: int, db: DBSession = Depends(get_db)):
 @router.get("/board-data")
 def board_data(user: User = Depends(get_current_user), db: DBSession = Depends(get_db)):
     """기존 보드의 `const DATA = {...}`와 같은 모양으로 돌려줍니다(2단계에서 보드가 이걸 불러옴)."""
-    jobs = [r.raw for r in db.execute(select(Job).order_by(Job.id)).scalars().all()]
+    jobs = [r.raw for r in db.execute(select(Job).order_by(Job.id)).scalars() if _visible(r)]
     out = {"jobs": jobs}
     for row in db.execute(select(SharedData)).scalars().all():
         if row.key.startswith("admin:"):

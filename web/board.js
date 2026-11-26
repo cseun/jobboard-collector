@@ -1745,7 +1745,7 @@ let DOCS_OPEN = '';
 const docsOf = name => Object.keys(DATA.docs || {}).find(n => sameCo(n, name));
 const prepNext = (j, k) => { const mk = mockOf(k), dn = docsOf(j.company), ap = dn && (DATA.docs[dn] || {}).apply; return `${ap && ap.url ? `<a class="act-next" href="${esc(ap.url)}" target="_blank" rel="noopener">🔗 지원 페이지</a>` : ''}${dn ? `<button class="act-next" data-docsco="${esc(dn)}">📝 서류 확인</button>` : ''}${mk ? `<button class="act-next" data-mockco="${esc(mk)}">🎤 면접 연습</button>` : ''}`; };
 document.addEventListener('click', e => { const b = e.target.closest('[data-docsco]'); if (!b) return; e.preventDefault(); DOCS_OPEN = b.dataset.docsco; show('docs'); });
-const prepKey = j => { if (j && j.kind === 'ov') return 'ov-' + coKey(j.company + j.title).replace(/[^\w가-힣]/g, '').slice(0, 48); const m = String(j.r['원문 URL'] || '').match(/rec_idx=(\d+)/); return m ? 'sr' + m[1] : 'co-' + coKey(j.company).slice(0, 40); };
+const prepKey = j => { if (j && j.kind === 'ov') return 'ov-' + coKey(j.company + j.title).replace(/[^\w가-힣]/g, '').slice(0, 48); if (j?.r?.['직무별 공고 키']) return String(j.r['직무별 공고 키']); const m = String(j.r['원문 URL'] || '').match(/rec_idx=(\d+)/); return m ? 'sr' + m[1] : 'co-' + coKey(j.company).slice(0, 40); };
 let PREPDB = null, PREPDB_P = null;
 const prepDb = () => PREPDB_P || (PREPDB_P = (async () => { try { PREPDB = window.claude ? await window.claude.use('db') : null; } catch { PREPDB = null; } return PREPDB; })());
 (async () => { try { const db = await prepDb(); if (!db) return; const q = await db.collection('prep').get(); const docs = (q && (q.docs || (typeof q.forEach === 'function' ? (() => { const a = []; q.forEach(d => a.push(d)); return a; })() : []))) || []; docs.forEach(d => { try { const v = thaw(typeof d.data === 'function' ? d.data() : d.data); if (v && !PREP[d.id]) PREPREQ[d.id] = v; } catch {} }); } catch {} })();
@@ -5592,7 +5592,7 @@ const POOL_TXT = ['기업명', '근무 위치', '규모·사원수', '접수 상
 const POOL_LONG = ['회사 설명·제품', '공고명·담당 업무', '필수', '우대', '전형 절차'];
 const POOL_COND = ['4년제', '초대졸', '고졸', '석사', 'OPIc NH', 'OPIc IL', 'OPIc IM1', 'OPIc IM2', 'OPIc IM3', 'OPIc IH', 'OPIc AL', '영어 회화', '일본어', '중국어', '관련 전공', '운전면허', '출장 가능', '교육 이수', '관련 경험', '정보처리기사', '정보처리산업기사', '정보처리(산업)기사', 'SQLD'];
 const POOL_EDU = ['학력 무관', '초대졸', '4년제', '석사', '박사'];
-const jobKey = r => { const u = String(r['원문 URL'] || ''); let m;
+const jobKey = r => { if (r['직무별 공고 키']) return String(r['직무별 공고 키']); const u = String(r['원문 URL'] || ''); let m;
   if ((m = u.match(/rec_idx=(\d+)/))) return 'sr' + m[1]; if ((m = u.match(/GI_Read\/(\d+)/))) return 'jk' + m[1]; if ((m = u.match(/wanted\.co\.kr\/wd\/(\d+)/))) return 'wt' + m[1];
   return 'co' + coKey(r['기업명']) + '|' + plain(r['공고명·담당 업무']).split(';')[0].replace(/\s/g, ''); };
 // 기여자가 쓴 문서를 믿지 않고 검사해서 깨끗한 행만 만든다 (허용한 칸만 복사, 링크는 https 원문 주소만)
