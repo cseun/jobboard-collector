@@ -5177,7 +5177,7 @@ const SIDE = [
   ['apply', '📨', '지원', [['apps', '지원 현황', 'n-apps', '진행']]],
   ['ready', '📝', '준비', [['docs', '서류 준비'], ['resume', '이력서·포트폴리오'], ['mock', '모의면접'], ['aiiv', 'AI 모의면접'], ['proj', '프로젝트 점검'], ['prep', '역량 준비'], ['lib', '자료실', 'n-lib', '개']]],
   ['self', '🌱', '나', [['self', '나 알아가기'], ['learn', '직무 이해·나의 정의']]],
-  ['cfg', '⚙️', '내 설정', [['me', '내 정보'], ['ak', '지원서 입력'], ['pf', '내 기준'], ['col', '수집 설정'], ['set', '설정·백업'], ...(POOL_ON ? [['contrib', '공고 기여하기']] : []), ['export', 'ChatGPT 보드로 옮기기'], ['later', '추후 과제'], ['help', '도움말 · 의견']]]
+  ['cfg', '⚙️', '내 설정', [['me', '내 정보'], ['ak', '지원서 입력'], ['pf', '내 기준'], ['col', '수집 설정'], ['set', '설정·백업'], ...(POOL_ON ? [['contrib', '공고 기여하기']] : []), ['later', '추후 과제'], ['help', '도움말 · 의견']]]
 ];
 const SIDE_LABEL = Object.fromEntries(SIDE.flatMap(([, , , L]) => L.map(([v, t]) => [v, t]))); SIDE_LABEL.poolmod = '🛡️ 기여 승인'; SIDE_LABEL.set = '⚙️ 설정·백업';
 function sideRender() {
@@ -5992,7 +5992,7 @@ function vResume() {
     else if (a === 'aiapply') { let n = 0; document.querySelectorAll('[data-df]').forEach(c => { if (!c.checked) return; const x = RS.aiRes[+c.dataset.df], p = rsPj().find(q => q._id === x.id); if (p) { p[x.f] = x.nv; n++; } }); if (n) { rsSave(); rsRenderCards(); rsRenderPreview(); } RS.aiRes = null; document.getElementById('rsAiOut').innerHTML = `<div class="pill high">${n}개 항목을 반영했어요</div>`; } };
 }
 
-// ===== 📦 ChatGPT 보드로 내 정보 옮기기 — 이 브라우저의 내 기록을 ChatGPT 보드 백업 형식(robot-board-original v2)으로 =====
+// ===== 💾 개인 기록 백업 (기존 백업 파일과 호환되는 형식 유지) =====
 const EX_GROUPS = [
   ['info', '📄 내 정보', '이력서용 정보·학력·전공 과목·경력·프로젝트·기술·지원서 입력 정보·내 기준', ['ud-profile', 'ud-applyKit', 'pf']],
   ['apps', '📨 지원 기록·자소서', '지원 현황, 자소서 초안, 숨긴 공고·회사, 관심 회사', ['ud-apps', 'ud-ws', 'ud-chatRooms', 'ud-letters', 'ud-drafts', 'ud-hidden', 'ud-hiddenCos', 'ud-hiddenCoWhy', 'ud-coStar']],
@@ -6000,30 +6000,8 @@ const EX_GROUPS = [
   ['place', '📍 내 장소·수집 설정', '내 주변 회사용 장소, 통근 설정, 자동 수집 설정', ['places', 'ud-places', 'ud-commute', 'col']]
 ];
 const exGet = k => { try { return localStorage.getItem(k); } catch { return null; } };
-function exSummary(k, v) {
-  try { const o = JSON.parse(v); const d = o && o.v !== undefined ? o.v : o;
-    if (k === 'ud-profile' && d && typeof d === 'object') return PROF_KEYS.filter(x => (d[x] || []).length).map(x => `${x} ${d[x].length}`).join(' · ') || '비어 있음';
-    if (k === 'ud-applyKit') return d && d.text ? `${d.text.split('\n').length}줄` : '비어 있음';
-    if (k === 'pf') return `가진 것 ${Object.keys((d.have || {}).tech || {}).length}개 기술 · 원하는 것 ${Object.keys(d.roles || {}).length + Object.keys(d.cats || {}).length + Object.keys(d.wel || {}).length}개`;
-    if (Array.isArray(d)) return `${d.length}건`; if (d && typeof d === 'object') return `${Object.keys(d).length}개 항목`; } catch {}
-  return `${v.length.toLocaleString()}자`;
-}
 function exFound() { const out = []; EX_GROUPS.forEach(([id, , , keys]) => keys.forEach(k => { const v = exGet(k); if (v != null && v !== '' && v !== '{}' && v !== '[]') out.push({ id, k, v }); })); return out; }
 function exBuild(ids) { const sel = exFound().filter(x => ids.includes(x.id)); return { format: 'robot-board-original', version: 2, exportedAt: new Date().toISOString(), documents: [], storage: sel.map(x => [x.k, x.v]), files: [] }; }
-function vExport() {
-  const found = exFound();
-  $('#view').innerHTML = `<section class="row"><div class="top"><b>📦 ChatGPT 보드로 내 정보 옮기기</b><span class="note">이 브라우저에 저장된 내 기록 기준</span></div>
-    <p class="note" style="margin:0">두 보드는 같은 저장 항목 이름을 써서, 아래 파일을 ChatGPT 보드의 <b>내 설정 → 설정·백업 → 백업 복원</b>에서 고르면 내 정보가 그대로 들어가요. 전공 과목·성적, 해외 경험, 지원서 입력 정보까지 칸 하나도 줄이지 않고 옮겨요.</p>
-    <p class="note" style="margin:0;color:var(--hot)">⚠️ 복원하면 ChatGPT 보드에 있던 개인 기록(지원 기록·자소서 등)이 이 파일 내용으로 <b>교체</b>돼요. 먼저 ChatGPT 보드에서 백업을 받아 두세요. API 키는 들어 있지 않아요.</p></section>
-  ${EX_GROUPS.map(([id, t, d, keys]) => { const f = found.filter(x => x.id === id); return `<section class="row"><label class="top"><span><input type="checkbox" data-exg="${id}" ${f.length ? 'checked' : 'disabled'}> <b>${t}</b></span><span class="note">${f.length ? f.length + '종' : '저장된 게 없어요'}</span></label><p class="note" style="margin:0">${d}</p>
-    ${f.map(x => `<div class="note">· <code>${esc(x.k)}</code> — ${esc(exSummary(x.k, x.v))}</div>`).join('')}</section>`; }).join('')}
-  <section class="row"><div style="display:flex;gap:6px;flex-wrap:wrap"><button type="button" class="mk-btn pri" id="exGo" ${found.length ? '' : 'disabled'}>백업 파일 만들기</button></div><p class="note" id="exMsg" style="margin:0">${found.length ? '' : '이 브라우저에는 옮길 기록이 없어요. 내 정보를 쓰던 같은 브라우저에서 열어 주세요.'}</p></section>`;
-  const go = document.getElementById('exGo'); if (go) go.onclick = async () => {
-    const ids = [...document.querySelectorAll('[data-exg]')].filter(c => c.checked).map(c => c.dataset.exg), msg = document.getElementById('exMsg');
-    if (!ids.length) { msg.textContent = '옮길 묶음을 하나 이상 고르세요'; return; }
-    const o = exBuild(ids), blob = new Blob([JSON.stringify(o)], { type: 'application/json' }), fn = `robot-board-backup-${kDate()}.json`;
-    try { if (LIB_DL) { const r = await LIB_DL.save({ filename: fn, data: blob }); msg.textContent = r && r.status === 'saved' ? `✅ ${o.storage.length}종을 담아 저장했어요 — ChatGPT 보드 설정·백업에서 복원하세요` : '저장을 취소했어요'; } else { const u = URL.createObjectURL(blob), l = document.createElement('a'); l.href = u; l.download = fn; l.click(); setTimeout(() => URL.revokeObjectURL(u), 3000); msg.textContent = `✅ ${o.storage.length}종을 담았어요`; } } catch { msg.textContent = '저장하지 못했어요'; } };
-}
 
 
 // ===== 🧭 취업 준비 통합 매니저 (7단계) =====
@@ -6107,8 +6085,7 @@ function vSet() {
   <section class="row"><div class="top"><b>💾 백업</b><span class="note">${found.length}종 저장됨</span></div>
     <p class="note" style="margin:0">내 정보·지원 기록·자소서·모의면접 답·나 알아가기·프로젝트 점검 등 이 브라우저에 저장된 개인 기록을 JSON 파일로 내려받거나 되살려요. 백업 파일에는 개인정보가 들어 있으니 보관에 주의하세요.</p>
     <div class="links"><button type="button" class="mk-btn pri" id="bkOut" ${found.length ? '' : 'disabled'}>전체 기록 내보내기</button>
-      <label class="mk-btn" style="cursor:pointer">백업 가져오기<input type="file" id="bkIn" accept="application/json,.json" hidden></label>
-      <button type="button" class="ghost" data-goto="export">📦 ChatGPT 보드로 옮기기</button></div>
+      <label class="mk-btn" style="cursor:pointer">백업 가져오기<input type="file" id="bkIn" accept="application/json,.json" hidden></label></div>
     <p class="note" style="margin:0;color:var(--hot)">⚠️ 가져오기를 하면 같은 항목의 현재 기록이 파일 내용으로 교체돼요.</p>
     <p class="note" id="bkMsg" style="margin:0"></p></section>
   <section class="row"><div class="top"><b>📡 연결 상태</b></div>
@@ -6142,7 +6119,7 @@ function vSet() {
   };
 }
 
-const VIEWS = { career: vCareer, set: vSet, export: vExport, resume: vResume, poolmod: vPoolMod, contrib: vContrib, coach: vCoach, learn: vLearn, ak: vAk, aiiv: vAiiv, guide: vGuide, cos: vCos, near: vNear, pf: vPf, col: vCollect, self: vSelf, docs: vDocs, help: vHelp, proj: vProj, cmp: vCompare, week: vWeek, todo: vTodo, picks: vPicks, domestic: vDomestic, overseas: vOverseas, apps: vApps, interview: vInterview, mock: vMock, lib: vLib, me: vMe, prep: vPrep, later: vLater, ws: () => vWs('') };
+const VIEWS = { career: vCareer, set: vSet, resume: vResume, poolmod: vPoolMod, contrib: vContrib, coach: vCoach, learn: vLearn, ak: vAk, aiiv: vAiiv, guide: vGuide, cos: vCos, near: vNear, pf: vPf, col: vCollect, self: vSelf, docs: vDocs, help: vHelp, proj: vProj, cmp: vCompare, week: vWeek, todo: vTodo, picks: vPicks, domestic: vDomestic, overseas: vOverseas, apps: vApps, interview: vInterview, mock: vMock, lib: vLib, me: vMe, prep: vPrep, later: vLater, ws: () => vWs('') };
 const NAVH = []; // 뒤로가기용 화면 기록
 function goBack() { const p = NAVH.pop(); if (!p) return; show.back = true; try { show(p); } finally { show.back = false; } }
 function backSync() { const b = document.getElementById('backBtn'); if (b) b.hidden = !NAVH.length; }
@@ -6221,7 +6198,7 @@ try { $('#n-cmp').textContent = cmpRows().length; } catch {}
 $('#n-apps').textContent = apps.filter(appActive).length;
 $('#n-overseas').textContent = overseas.filter(o => o.g !== '제외').length;
 $('#n-interview').textContent = interviews.length;
-const NAV_GRP = { home: ['week', 'guide', 'todo'], mgr: ['career', 'ws', 'coach'], jobs: ['domestic', 'picks', 'overseas', 'near'], co: ['cos', 'cmp', 'interview'], apply: ['apps'], ready: ['docs', 'resume', 'mock', 'aiiv', 'proj', 'prep', 'lib'], self: ['self', 'learn'], cfg: ['me', 'ak', 'pf', 'col', 'set', 'contrib', 'export', 'later', 'help'] };
+const NAV_GRP = { home: ['week', 'guide', 'todo'], mgr: ['career', 'ws', 'coach'], jobs: ['domestic', 'picks', 'overseas', 'near'], co: ['cos', 'cmp', 'interview'], apply: ['apps'], ready: ['docs', 'resume', 'mock', 'aiiv', 'proj', 'prep', 'lib'], self: ['self', 'learn'], cfg: ['me', 'ak', 'pf', 'col', 'set', 'contrib', 'later', 'help'] };
 // ===== 🗂 공고별 준비 공간 — 분석(요구사항↔내 경험 대조·공고 상담) · 서류 · 면접 · 프로젝트 · 계획·할 일 =====
 const WS_ST = [['', '미확인'], ['ok', '근거 있음'], ['gap', '보완 필요'], ['none', '경험 없음']];
 const WS_FRAMES = [['evidence', '① 근거 보완'], ['revise', '② 기존 프로젝트 수정'], ['apply', '③ 바로 지원'], ['hold', '④ 보류']];
