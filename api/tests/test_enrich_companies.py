@@ -39,6 +39,12 @@ def test_company_page_parser():
     assert c["sum"] == ["업력 6년차 2021년 2월 2일 설립", "중소기업 기업형태", "8 명 출처: 국민연금 사원수", "13억 8,644만원 매출액"]
     assert c["det"][0] == "업종 배전반 및 전기 자동제어반 제조업" and "사업내용 전기,전자장비" in c["det"] and c["det"][-1].startswith("주소 경남 창원시") and not c["det"][-1].endswith("지도보기")
     assert c["wel"] == [["지원금/보험", "건강검진 직원대출제도"], ["급여제도", "퇴직연금 4대 보험"]] and c["intro"] == []
+    assert c["fields"] == {"업종": "배전반 및 전기 자동제어반 제조업", "대표자명": "하현수",
+                           "사업내용": "전기,전자장비", "홈페이지": "http://www.robotic-box.example",
+                           "주소": "경남 창원시 성산구 전기의길 10, 102호 (성주동,한국전기연구원 기술창업센터)",
+                           "설립일": "2021년 2월 2일 설립", "업력": "업력 6년차", "기업형태": "중소기업",
+                           "매출액": "13억 8,644만원", "사원수": "8명",
+                           "복지": {"지원금/보험": "건강검진 직원대출제도", "급여제도": "퇴직연금 4대 보험"}}
     assert cs.saramin_company_parse("<html>차단됨</html>") is None
     assert cs.company_headcount(c["sum"]) == "8명" and cs.company_headcount(["13억 매출액"]) == ""
     assert cs.saramin_company_url("ab+/c=") == "https://www.saramin.co.kr/zf_user/company-info/view?csn=ab%2B%2Fc="

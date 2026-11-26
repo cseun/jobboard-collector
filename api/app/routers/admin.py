@@ -169,6 +169,8 @@ def job_plan(source: str = Query(default="wanted"), pages: int = Query(default=W
 
 @router.post("/job-import")
 def job_import(body: JobImportIn, admin: User = Depends(require_admin)):
-    """내 PC Chrome이 읽은 목록 JSON을 서버 규칙(아는 공고·경력/학력/제외어·AI 제목 판정·저장)으로 처리. 목록 정보만 저장(상세는 읽지 않음)."""
+    """PC 목록은 미리보기만 허용한다. 상세·회사 정보 없는 공고는 저장하지 않는다."""
     from scripts import collect as co
+    if body.apply:
+        raise HTTPException(422, "목록만으로는 저장하지 않습니다. 공고 상세·회사 정보·마감 검증이 필요합니다.")
     return co.import_listing(body.source, [p.model_dump() for p in body.pages], apply=body.apply, email=admin.email, compact=[i.model_dump() for i in body.items])

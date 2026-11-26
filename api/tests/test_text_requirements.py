@@ -1,7 +1,7 @@
 from pathlib import Path
 
 from scripts.collect import parse_detail
-from scripts.text_requirements import parse_requirements
+from scripts.text_requirements import parse_requirements, parse_sections
 
 FX = Path(__file__).parent / "fixtures"
 
@@ -17,6 +17,13 @@ def test_basic_sections_and_bullets():
     t = "주요업무\n- ROS 개발\n자격요건\n1. 컴퓨터공학 전공\n2) C++ 가능자\n우대사항\n• ROS2 경험자\n• 영어 가능자\n근무조건\n정규직"
     r = parse_requirements(t)
     assert r["필수"] == "- 컴퓨터공학 전공\n- C++ 가능자" and r["우대"] == "- ROS2 경험자\n- 영어 가능자"
+
+
+def test_sections_keep_work_benefits_and_process_separate():
+    text = "주요업무\n- 로봇 제어\n필수 요건\n- C++ 개발\n우대 사항\n- ROS2\n복리후생\n- 식대 지원\n채용절차\n서류 → 면접"
+    sections = parse_sections(text)
+    assert sections == {"담당 업무": "- 로봇 제어", "필수": "- C++ 개발", "우대": "- ROS2",
+                        "복지": "- 식대 지원", "전형 절차": "- 서류 → 면접"}
 
 
 def test_inline_and_bracket_headings():

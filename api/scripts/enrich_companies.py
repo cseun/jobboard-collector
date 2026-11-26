@@ -108,6 +108,9 @@ def fill_jobs(db, csn: str, comp: dict) -> int:
             ch["규모·사원수"] = head
         if biz and str(raw.get("회사 설명·제품") or "").strip() in ("", "미확인", "-"):
             ch["회사 설명·제품"] = biz
+        if comp.get("fields") and not raw.get("회사 정보"):
+            ch["회사 정보"] = comp["fields"]
+            ch["회사 정보 출처"] = saramin_company_url(csn)
         if ch:
             j.raw = {**raw, **ch}
             n += 1

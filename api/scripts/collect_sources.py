@@ -263,7 +263,29 @@ def saramin_company_parse(html: str) -> dict | None:
         cat = next((t for t in li.stripped_strings if t.strip()), "")
         if items:
             wel.append([cat, " ".join(items)])
-    return {"sum": summ, "det": det, "intro": [], "wel": wel}
+    fields = {}
+    for item in det:
+        for label in ("사업내용", "업종", "대표자명", "주소", "홈페이지"):
+            if item.startswith(label + " "):
+                fields[label] = item[len(label) + 1:].strip()
+                break
+    for item in summ:
+        founded = re.search(r"\d{4}년\s*\d{1,2}월\s*\d{1,2}일\s*설립", item)
+        age = re.search(r"업력\s*\d+년차", item)
+        if founded:
+            fields["설립일"] = founded.group()
+        if age:
+            fields["업력"] = age.group()
+        if "기업형태" in item:
+            fields["기업형태"] = item.replace("기업형태", "").strip()
+        if "매출액" in item:
+            fields["매출액"] = item.replace("매출액", "").strip()
+    headcount = company_headcount(summ)
+    if headcount:
+        fields["사원수"] = headcount
+    if wel:
+        fields["복지"] = {category: items for category, items in wel}
+    return {"sum": summ, "det": det, "intro": [], "wel": wel, "fields": fields}
 
 
 def company_headcount(sum_list: list[str]) -> str:

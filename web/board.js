@@ -75,7 +75,7 @@ const jobMap = (r, i) => {
   const role = plain(r['공고명·담당 업무']), cut = role.indexOf(';');
   const mt = match([role, r['필수'], r['우대']].map(plain).join(' '));
   return { kind: 'kr', r, i, area: plain(r['상세 지역'] || '') || '미확인', avg: (() => { const g = String(r['급여(공고)'] || '').match(/(초봉|연봉|월급)\s*([\d,]+)\s*만/); if (g) { const v = +g[2].replace(/,/g, ''); return g[1] === '월급' ? v * 12 : v; } return +(String(r['1년차 대표'] || '').match(/^[\d,]+/) || ['0'])[0].replace(/,/g, ''); })(), dd: dueOf(r['마감(KST)']), region: plain(r['근무 위치']).split(/\s+/)[0] || '미확인',
-    company: plain(r['기업명']), title: cut > 0 ? role.slice(0, cut) : role, duty: cut > 0 ? role.slice(cut + 1).trim() : '',
+    company: plain(r['기업명']), title: cut > 0 ? role.slice(0, cut) : role, duty: plain(r['담당 업무'] || (cut > 0 ? role.slice(cut + 1).trim() : '')),
     isNew: newRecent(r), posted: dayOf(r['등록일']), seen: dayOf(r['최초 수집']), listOnly: false, matched: mt.m, _mt: mt,
     // 적합도는 수집 때 정하지 않고, 내 기술·경험(🎯 내 기준)으로 보드에서 계산합니다
     get fit() { try { const h = hireScore(this); return !h || h.pct === null ? '' : h.pct >= 70 ? 'high' : h.pct >= 40 ? 'mid' : 'low'; } catch { return ''; } },
@@ -197,15 +197,17 @@ function jobCard(j, opts = {}) {
       ${(() => { const f = flowOf(j); return `<dt>전형</dt><dd>${f.known ? esc(f.label) + (f.src !== '공고' ? ` <span class="note">(${esc(f.src)})</span>` : '') : '<span class="note">미확인 · 다음 수집 때 공고에서 읽어 와요</span>'}</dd>`; })()}
       <dt>필수</dt><dd>${md(r['필수'])}</dd>
       <dt>우대</dt><dd>${md(r['우대'])}</dd>
+      ${r['복지'] ? `<dt>복지</dt><dd>${md(r['복지'])}</dd>` : ''}
       ${q ? `<dt>요구 정리</dt><dd><span class="note">필수: ${esc(fq([...q['필수']['기술'], ...q['필수']['조건']]) || '읽은 것 없음')} / 우대: ${esc(fq([...q['우대']['기술'], ...q['우대']['조건']]) || '—')}</span></dd>` : ''}
       <dt>연봉</dt><dd>${salLine(r)}</dd>
       <dt>학력 요건</dt><dd>${esc(eduOf(r))}</dd>
       ${trackLine(r)}
-      <dt>회사</dt><dd>${md(r['회사 설명·제품'])} · ${md(r['규모·사원수'])}</dd>
+      ${r['회사 정보'] && Object.keys(r['회사 정보']).length ? ['사업내용', '업종', '기업형태', '사원수', '설립일', '매출액', '주소'].filter(k => r['회사 정보'][k]).map(k => `<dt>회사 ${esc(k)}</dt><dd>${esc(r['회사 정보'][k])}</dd>`).join('') : `<dt>회사</dt><dd>${md(r['회사 설명·제품'])} · ${md(r['규모·사원수'])}</dd>`}
+      ${/^https?:\/\//i.test(r['회사 정보']?.['홈페이지'] || '') ? `<dt>회사 홈페이지</dt><dd><a href="${esc(r['회사 정보']['홈페이지'])}" target="_blank" rel="noopener">${esc(r['회사 정보']['홈페이지'])}</a></dd>` : ''}
       ${r['상세 주소'] ? `<dt>주소</dt><dd>${esc(plain(r['상세 주소']))}</dd>` : ''}
       <dt>등록일</dt><dd>${r['등록일'] ? esc(r['등록일']) + (daysAgo(r['등록일']) !== null ? ` <span class="note">(${daysAgo(r['등록일'])}일 전)</span>` : '') : '<span class="note">미확인 · 사이트에서 읽어 오면 채워져요</span>'}</dd>
       <dt>최초 수집</dt><dd>${r['최초 수집'] ? esc(r['최초 수집']) + (r['최초 수집 추정'] ? ' <span class="note">(추정 · 최종 확인일 기준)</span>' : '') : '<span class="note">미확인</span>'}</dd>
-    </dl></div></details>`;
+    </dl>${r['원문 본문'] ? `<details class="source-text"><summary>원문 전체 보기</summary><div class="source-body">${md(r['원문 본문'])}</div></details>` : ''}</div></details>`;
 }
 function ovCard(o, opts = {}) {
   const r = o.r, links = linksOf(r['원문 URL']), cls = o.g === '우선' ? 'high' : o.g === '조건부' ? 'mid' : o.g === '제외' ? 'bad' : '';

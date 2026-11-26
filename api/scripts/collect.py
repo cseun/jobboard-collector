@@ -33,12 +33,14 @@ from sqlalchemy import select
 from app import config, crypto
 from app.dates import parse_date, today_kst
 from app.db import SessionLocal, init_db
-from app.models import CollectRun, Document, Job, User, utcnow
+from app.models import CollectRun, Document, Job, SharedData, User, utcnow
 from app.routers import ai as ai_mod
 from scripts import sync_sheet as ss
 from scripts import title_judge as tj
-from scripts.collect_sources import SOURCES, saramin_next, saramin_parse, wanted_parse_detail
-from scripts.text_requirements import parse_requirements
+from scripts.collect_sources import (SOURCES, company_headcount, saramin_company_parse,
+                                     saramin_company_url, saramin_next, saramin_parse,
+                                     saramin_status, wanted_parse_detail)
+from scripts.text_requirements import parse_requirements, parse_sections
 
 DETAIL_URL = "https://www.saramin.co.kr/zf_user/jobs/relay/view-detail?rec_idx={id}"
 VIEW_URL = "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx={id}"
@@ -96,6 +98,36 @@ def to_sheet_row(p: dict, ref: date) -> dict:
     if p["day_kind"] == "등록일":          # '수정일'은 등록일이 아니므로 넣지 않음
         d["posted"] = p["day"]
     return d
+
+
+def company_summary(comp: dict) -> str:
+    """기업정보 페이지의 실제 사업내용을 카드의 회사 설명으로 사용한다."""
+    fields = comp.get("fields") or {}
+    if fields.get("사업내용") or fields.get("업종"):
+        return fields.get("사업내용") or fields["업종"]
+    det = comp.get("det") or []
+    return next((x[5:].strip() for x in det if x.startswith("사업내용 ")), "") or next(
+        (x[3:].strip() for x in det if x.startswith("업종 ")), "")
+
+
+def quality_reason(p: dict, d: dict, comp: dict | None, live: dict | None, ref: date) -> str:
+    """상세·회사 정보와 실제 마감을 검증한 공고만 저장한다."""
+    if p.get("src", "saramin") != "saramin":
+        return "지원 사이트 상세 검증 미구현"
+    info = d.get("_detail")
+    if not info or info.get("is_image"):
+        return "상세 본문 없음 또는 이미지 전체 OCR 미완료"
+    sections = parse_sections(info.get("text") or "")
+    if not sections.get("담당 업무") or not sections.get("필수"):
+        return "업무·필수 항목 구분 실패"
+    if not live or (live.get("due") and live["due"] < ref) or (
+        not live.get("due") and live.get("kind") not in ("상시", "채용시")
+    ):
+        return "실제 접수 상태 확인 실패 또는 마감"
+    if not comp or not company_summary(comp):
+        return "회사 사업 정보 없음"
+    d["_sections"], d["_company"], d["_live"] = sections, comp, live
+    return ""
 
 
 # ───────────────────────── 상세 읽기 ─────────────────────────
@@ -445,9 +477,12 @@ def apply_ai_fields(raw: dict, data: dict, ref: date) -> None:
 def run(keywords: list[str] | None = None, apply: bool = False, details: bool = False, ai_images: int = 0, email: str | None = None,
         fetch=None, ref: date | None = None, say=print, stop_known=STOP_KNOWN, max_pages=MAX_PAGES, ai_reader=None, record: bool = True,
         max_career: int = MAX_CAREER, exclude: list[str] | None = None, keep_grad: bool = False, sources: list[str] | None = None,
-        judge: bool | None = None, judge_model: str = tj.JUDGE_MODEL, judge_max: int = JUDGE_MAX, judge_ask=None, watch: list[str] | None = None, watch_max: int = WATCH_MAX) -> dict:
+        judge: bool | None = None, judge_model: str = tj.JUDGE_MODEL, judge_max: int = JUDGE_MAX, judge_ask=None, watch: list[str] | None = None, watch_max: int = WATCH_MAX,
+        quality: bool = False) -> dict:
     """한 번 실행. 끝나면(실패해도) 수집 기록(collect_runs)에 한 줄을 남깁니다."""
     ref = ref or today_kst()
+    if apply and quality and not details:
+        raise ValueError("검증 저장에는 상세 조회(--details)가 필요합니다.")
     sources = sources or ["saramin"]
     keywords = keywords or load_keywords()
     fetch = fetch or Fetcher().get
@@ -455,7 +490,7 @@ def run(keywords: list[str] | None = None, apply: bool = False, details: bool = 
     cnt = {"list": 0, "detail": 0}
 
     def counted(url):                       # 사이트로 나간 요청을 목록/상세로 나눠 셉니다(실패한 요청도 셈)
-        cnt["detail" if ("view-detail" in url or "/api/v4/jobs/" in url) else "list"] += 1
+        cnt["detail" if ("view-detail" in url or "/jobs/relay/view?" in url or "company-info/view?" in url or "/api/v4/jobs/" in url) else "list"] += 1
         return fetch(url)
 
     run_id = None
@@ -471,7 +506,7 @@ def run(keywords: list[str] | None = None, apply: bool = False, details: bool = 
     out: dict = {}
     try:
         out = _run(keywords, apply, details, ai_images, email, counted, ref, say, stop_known, max_pages, ai_reader, st, max_career, exclude, keep_grad, sources,
-                   (apply if judge is None else judge), judge_model, judge_max, judge_ask, watch, watch_max)
+                   (apply if judge is None else judge), judge_model, judge_max, judge_ask, watch, watch_max, quality)
         st["status"] = "차단으로 중단" if out.get("중단") else "완료"
         return out
     except Exception as e:
@@ -501,7 +536,7 @@ def run(keywords: list[str] | None = None, apply: bool = False, details: bool = 
 
 
 def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known, max_pages, ai_reader, st, max_career=MAX_CAREER, exclude=None, keep_grad=False, sources=None,
-         judge=False, judge_model=tj.JUDGE_MODEL, judge_max=JUDGE_MAX, judge_ask=None, watch=None, watch_max=WATCH_MAX) -> dict:
+         judge=False, judge_model=tj.JUDGE_MODEL, judge_max=JUDGE_MAX, judge_ask=None, watch=None, watch_max=WATCH_MAX, quality=False) -> dict:
     sources = sources or ["saramin"]
     with SessionLocal() as db:
         dropped = drop_cache(db)
@@ -637,6 +672,53 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
             if senior_drops:
                 keep = [i for i, p in enumerate(new) if pkey(p) not in senior_drops]
                 new, rows = [new[i] for i in keep], [rows[i] for i in keep]
+        company_updates = {}
+        if quality:
+            company_row = db.get(SharedData, "companies")
+            known_companies = dict(company_row.value or {}) if company_row else {}
+            checked_companies = {}
+            approved, rejected = [], Counter()
+            for p, d in zip(new, rows):
+                info = d.get("_detail")
+                csn = p.get("csn")
+                if p.get("src", "saramin") != "saramin" or not csn or not info or info.get("is_image"):
+                    rejected["지원 사이트·회사 번호·텍스트 상세 확인 불가"] += 1
+                    continue
+                sections = parse_sections(info.get("text") or "")
+                if not sections.get("담당 업무") or not sections.get("필수"):
+                    rejected["업무·필수 항목 구분 실패"] += 1
+                    continue
+                try:
+                    live = saramin_status(fetch(SOURCES["saramin"].view(p["id"])))
+                    if not live or (live.get("due") and live["due"] < ref) or (
+                        not live.get("due") and live.get("kind") not in ("상시", "채용시")
+                    ):
+                        rejected["실제 접수 상태 미확인 또는 마감"] += 1
+                        continue
+                    if csn not in checked_companies:
+                        cached = known_companies.get(csn)
+                        checked_companies[csn] = cached if cached and cached.get("fields") else saramin_company_parse(fetch(saramin_company_url(csn)))
+                    comp = checked_companies[csn]
+                except Blocked as e:
+                    out["중단"] = str(e)
+                    rejected["사이트 차단"] += 1
+                    break
+                except httpx.HTTPError:
+                    rejected["상태·회사 페이지 읽기 실패"] += 1
+                    continue
+                why = quality_reason(p, d, comp, live, ref)
+                if why:
+                    rejected[why] += 1
+                    continue
+                if live.get("due"):
+                    d["due"] = live["due"].isoformat()
+                    d.pop("due_state", None)
+                elif live.get("kind") in ("상시", "채용시"):
+                    d["due_state"] = live["kind"]
+                company_updates[csn] = comp
+                approved.append((p, d))
+            new, rows = [p for p, _ in approved], [d for _, d in approved]
+            out["품질 검증"] = {"저장 후보": len(new), "제외": dict(rejected)}
         save_drop(db, {**jdrops, **senior_drops}, ref)
         plan = ss.plan([{k: v for k, v in d.items() if not k.startswith("_")} for d in rows], list(db.execute(select(Job)).scalars()), ref)
         extras = {ss.canon(d["url"]): d for d in rows}
@@ -657,7 +739,7 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                     raw["필수·우대 출처"] = "원티드 API"
                 raw["원문 본문"] = "\n\n".join(x for x in (w["tasks"], w["req"], w["pref"], w["benefits"]) if x)[:BODY_KEEP]
             if info:
-                raw["원문 본문"] = info["text"][:BODY_KEEP] if not info["is_image"] else ""
+                raw["원문 본문"] = info["text"] if not info["is_image"] else ""
                 if not info["is_image"]:                       # 텍스트 공고: 규칙으로 필수·우대를 나눔(못 찾으면 빈칸으로 남김)
                     req = parse_requirements(info["text"])
                     for k, v in req.items():
@@ -669,7 +751,21 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                     raw["이미지 주소"] = info["images"][:6]     # 한도 때문에 못 읽은 공고를 다음 날 다시 읽을 때 씀
             if ai:
                 apply_ai_fields(raw, ai["data"], ref)
+            if d.get("_sections"):
+                raw.update(d["_sections"])
+                raw["상세 확인일"] = ref.isoformat()
+            if d.get("_company"):
+                raw["회사 설명·제품"] = company_summary(d["_company"])[:300]
+                raw["규모·사원수"] = company_headcount(d["_company"].get("sum") or [])
+                raw["회사 정보"] = d["_company"].get("fields") or {}
+                raw["회사 정보 출처"] = saramin_company_url(d["csn"])
         ss.apply_plan(db, plan)
+        if company_updates:
+            row = db.get(SharedData, "companies")
+            if row is None:
+                row = SharedData(key="companies", value={})
+                db.add(row)
+            row.value = {**(row.value or {}), **company_updates}
         db.commit()
         backlog = 0
         if details and ai_images and "saramin" not in blocked_src:
@@ -849,11 +945,12 @@ def main(argv=None) -> int:
         ap.error(f"모르는 사이트: {', '.join(bad)} (saramin · jobkorea · wanted · all)")
     kws = [k.strip() for k in a.keywords.split(",") if k.strip()] if a.keywords else load_keywords(Path(a.keywords_file) if a.keywords_file else None)
     f = Fetcher(sleep=tuple(a.sleep), max_requests=a.max_requests)
-    res = run(kws, apply=a.apply and not a.dry_run, details=a.details, ai_images=a.ai_images, email=a.email, fetch=f.get,
+    saving = a.apply and not a.dry_run
+    res = run(kws, apply=saving, details=a.details or saving, ai_images=a.ai_images, email=a.email, fetch=f.get,
               stop_known=a.stop_known, max_pages=a.max_pages, max_career=a.max_career, keep_grad=a.keep_grad, sources=srcs,
               judge=a.judge, judge_model=a.judge_model, judge_max=a.judge_max,
               watch=[] if a.no_watch else load_watch(Path(a.watch_file) if a.watch_file else None), watch_max=a.watch_max,
-              exclude=[w.strip() for w in a.exclude_words.split(",") if w.strip()] if a.exclude_words else load_exclude())
+              exclude=[w.strip() for w in a.exclude_words.split(",") if w.strip()] if a.exclude_words else load_exclude(), quality=saving)
     res["요청 수"] = f.n
     print(json.dumps({k: v for k, v in res.items() if k != "키워드별"}, ensure_ascii=False, indent=2))
     return 2 if res.get("중단") else 0

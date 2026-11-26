@@ -47,6 +47,19 @@ def test_parse_detail_text_and_image():
     assert i["is_image"] and i["images"] == ["https://pds.saramin.co.kr/recruit/2026/11/24/abc_1.jpg", "https://pds.saramin.co.kr/recruit/2026/11/24/abc_2.png"]
 
 
+def test_quality_requires_structured_detail_company_and_live_deadline():
+    from scripts.collect_sources import saramin_company_parse
+    company = saramin_company_parse((FX / "saramin_company.html").read_text(encoding="utf-8"))
+    p = {"src": "saramin"}
+    d = {"_detail": co.parse_detail(DET_TEXT)}
+    assert co.quality_reason(p, d, company, {"due": date(2026, 12, 9), "kind": "date"}, TODAY) == ""
+    assert "임베디드 리눅스" in d["_sections"]["담당 업무"]
+    assert co.quality_reason(p, d, company, {"due": date(2026, 11, 24), "kind": "date"}, TODAY)
+    assert co.quality_reason(p, d, None, {"due": date(2026, 12, 9), "kind": "date"}, TODAY)
+    assert co.quality_reason(p, {"_detail": co.parse_detail(DET_IMG)}, company,
+                             {"due": date(2026, 12, 9), "kind": "date"}, TODAY)
+
+
 def fake_fetch(pages):
     calls = []
 
