@@ -21,6 +21,10 @@ if ! flock -n 9; then echo "[$(date '+%F %T')] 이미 실행 중이라 건너뜀
     echo "--- 회사 정보(최대 ${COMPANY_MAX:-40}곳) ---"
     timeout 3600 docker compose exec -T api python -m scripts.enrich_companies --apply --max "${COMPANY_MAX:-40}" --geo-max "${GEO_MAX:-20}" --find-max "${FIND_MAX:-30}" --news-max "${NEWS_MAX:-30}"
   fi
+  if [ "${DETAIL_BACKFILL_MAX:-0}" != "0" ]; then
+    echo "--- 기존 공고 상세 재조회(최대 ${DETAIL_BACKFILL_MAX}건) ---"
+    timeout 3600 docker compose exec -T api python -m scripts.backfill_details --apply --max "${DETAIL_BACKFILL_MAX}"
+  fi
   if [ "${REFRESH_MAX:-150}" != "0" ]; then
     echo "--- 마감 갱신(최대 ${REFRESH_MAX:-150}건) ---"
     timeout 3600 docker compose exec -T api python -m scripts.refresh_status --apply --max "${REFRESH_MAX:-150}"

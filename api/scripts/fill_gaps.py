@@ -27,7 +27,7 @@ from app.models import CollectRun, Job, utcnow
 from app.routers import ai as ai_mod
 from scripts import collect as co
 from scripts import sync_sheet as ss
-from scripts.collect_sources import jobkorea_parse_detail
+from scripts.collect_sources import jobkorea_parse_detail, jobkorea_parse_frame
 from scripts.text_requirements import parse_requirements
 
 FIELDS = ("필수", "우대", "급여(공고)", "전형 절차", "근무 위치")
@@ -79,7 +79,7 @@ def source_text(j: Job, fetch) -> tuple[str, str]:
     url = co.SOURCES["jobkorea"].view(rid)
     d = jobkorea_parse_detail(fetch(url))
     if len(d["text"]) < TEXT_MIN * 3 and d["iframe"]:
-        d = jobkorea_parse_detail(fetch(urljoin(url, d["iframe"])))
+        d = jobkorea_parse_frame(fetch(urljoin(url, d["iframe"])))
     return (d["text"], "잡코리아 상세") if len(d["text"]) >= TEXT_MIN else ("", "본문을 읽지 못함(본문이 따로 로드되는 형식일 수 있음)")
 
 

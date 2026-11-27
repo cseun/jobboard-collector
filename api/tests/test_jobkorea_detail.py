@@ -2,7 +2,7 @@ from datetime import date
 from html import escape
 
 from scripts import collect as co
-from scripts.collect_sources import jobkorea_parse_detail, jobkorea_status
+from scripts.collect_sources import jobkorea_parse_detail, jobkorea_parse_frame, jobkorea_status
 
 
 def _page(body: str, due: str = "2026.12.09") -> str:
@@ -34,3 +34,13 @@ def test_jobkorea_image_and_outer_page_text_cannot_pass():
     assert img["is_image"] and img["images"] == ["https://example.org/posting.png"]
     assert co.quality_reason({"src": "jobkorea", "title": "로봇 SW"}, {"_detail": img}, {"fields": {"업종": "로봇 제조업"}},
                              {"due": date(2026, 12, 9), "kind": "date"}, date(2026, 11, 27))
+
+
+def test_company_name_variants_match_but_other_company_does_not():
+    assert co.company_name_key("(주) 에이로봇") == co.company_name_key("㈜에이로봇")
+    assert co.company_name_key("에이로봇") != co.company_name_key("에이로봇서비스")
+
+
+def test_explicit_legacy_frame_keeps_only_frame_body():
+    frame = jobkorea_parse_frame("<html><body><h3>필수 요건</h3><p>ROS2 경험</p></body></html>")
+    assert frame["text"] == "필수 요건\nROS2 경험" and not frame["is_image"]

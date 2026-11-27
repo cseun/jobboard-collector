@@ -204,6 +204,17 @@ def jobkorea_parse_detail(html: str) -> dict:
             "company_name": (writer.get("content") or "").strip() if writer else "", "company_fields": fields}
 
 
+def jobkorea_parse_frame(html: str) -> dict:
+    """상세 페이지가 명시적으로 가리킨 구형 iframe 안의 본문만 읽는다."""
+    soup = BeautifulSoup(html, "html.parser")
+    images = [("https:" + src if src.startswith("//") else src)
+              for im in soup.select("img[src]") if (src := im.get("src", "").strip())]
+    for tag in soup.select("script,style,noscript"):
+        tag.decompose()
+    text = re.sub(r"\n{3,}", "\n\n", soup.get_text("\n", strip=True)).strip()
+    return {"text": text, "images": images, "is_image": bool(images) and len(text) < 80}
+
+
 # ───────────────────── 마감 확인(이미 저장한 공고를 다시 볼 때) ─────────────────────
 _DUE_META = re.compile(r"마감일\s*[:：]\s*([^,<\"']+)")
 _DATE_ANY = re.compile(r"(\d{4})[.\-/](\d{1,2})[.\-/](\d{1,2})")

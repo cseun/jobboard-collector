@@ -37,7 +37,7 @@ from app.models import CollectRun, Document, Job, SharedData, User, utcnow
 from app.routers import ai as ai_mod
 from scripts import sync_sheet as ss
 from scripts import title_judge as tj
-from scripts.collect_sources import (SOURCES, company_headcount, jobkorea_parse_detail, jobkorea_status, saramin_company_parse,
+from scripts.collect_sources import (SOURCES, company_headcount, jobkorea_parse_detail, jobkorea_parse_frame, jobkorea_status, saramin_company_parse,
                                      saramin_company_url, saramin_next, saramin_parse,
                                      saramin_status, wanted_parse_detail)
 from scripts.text_requirements import parse_requirements, parse_sections
@@ -108,6 +108,13 @@ def company_summary(comp: dict) -> str:
     det = comp.get("det") or []
     return next((x[5:].strip() for x in det if x.startswith("사업내용 ")), "") or next(
         (x[3:].strip() for x in det if x.startswith("업종 ")), "")
+
+
+def company_name_key(name: str) -> str:
+    """(주)·㈜·주식회사 같은 표기 차이만 무시한다. 서로 다른 회사명을 합치지 않는다."""
+    name = re.sub(r"^\s*(?:\(\s*주\s*\)|㈜|주식회사)\s*", "", str(name or ""))
+    name = re.sub(r"\s*(?:\(\s*주\s*\)|㈜|주식회사)\s*$", "", name)
+    return re.sub(r"[^가-힣a-z0-9]", "", name.lower())
 
 
 def unrelated_role_reason(title: str, work: str) -> str:
@@ -522,7 +529,7 @@ def run(keywords: list[str] | None = None, apply: bool = False, details: bool = 
     cnt = {"list": 0, "detail": 0}
 
     def counted(url):                       # 사이트로 나간 요청을 목록/상세로 나눠 셉니다(실패한 요청도 셈)
-        cnt["detail" if ("view-detail" in url or "/jobs/relay/view?" in url or "company-info/view?" in url or "/api/v4/jobs/" in url) else "list"] += 1
+        cnt["detail" if ("view-detail" in url or "/jobs/relay/view?" in url or "company-info/view?" in url or "/api/v4/jobs/" in url or "/Recruit/GI_Read/" in url) else "list"] += 1
         return fetch(url)
 
     run_id = None
@@ -635,6 +642,9 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                 try:
                     html = fetch(SOURCES["jobkorea"].view(p["id"]))
                     info = jobkorea_parse_detail(html)
+                    if not info["text"] and info["iframe"]:
+                        frame_url = urllib.parse.urljoin(SOURCES["jobkorea"].view(p["id"]), info["iframe"])
+                        info = {**info, **jobkorea_parse_frame(fetch(frame_url))}
                 except Blocked as e:
                     out["중단"] = cr["blocked"] = str(e)
                     blocked_src.add("jobkorea")
@@ -754,8 +764,7 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                         continue
                     if src == "jobkorea":
                         # 채용 회사명과 페이지 작성자명이 다르면 대행·잘못 연결된 상세일 수 있다.
-                        norm = lambda s: re.sub(r"[^가-힣a-z0-9]", "", str(s).lower().replace("주식회사", "").replace("㈜", ""))
-                        if not info.get("company_name") or norm(info["company_name"]) != norm(p["company"]):
+                        if not info.get("company_name") or company_name_key(info["company_name"]) != company_name_key(p["company"]):
                             rejected["잡코리아 회사명 불일치"] += 1
                             continue
                         comp = {"fields": info.get("company_fields") or {}}
