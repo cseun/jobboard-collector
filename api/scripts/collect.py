@@ -732,6 +732,7 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                 keep = [i for i, p in enumerate(new) if pkey(p) not in senior_drops]
                 new, rows = [new[i] for i in keep], [rows[i] for i in keep]
         company_updates = {}
+        image_candidates = {}
         if quality:
             company_row = db.get(SharedData, "companies")
             known_companies = dict(company_row.value or {}) if company_row else {}
@@ -745,6 +746,11 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                     rejected["지원 사이트·회사 번호·텍스트 상세 확인 불가"] += 1
                     continue
                 if info.get("is_image"):
+                    if src in ("saramin", "jobkorea") and info.get("images"):
+                        image_candidates[pkey(p)] = {"id": pkey(p).replace(":", "_"), "posting_url": SOURCES[src].view(p["id"]),
+                                                     "company": p.get("company", ""), "title": p.get("title", ""),
+                                                     "images": [urllib.parse.urljoin(SOURCES[src].view(p["id"]), u) for u in info["images"]],
+                                                     "found_on": ref.isoformat()}
                     rejected["이미지 본문 OCR 검증 대기"] += 1
                     continue
                 sections = parse_sections(info.get("text") or "")
@@ -841,6 +847,14 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                 row = SharedData(key="companies", value={})
                 db.add(row)
             row.value = {**(row.value or {}), **company_updates}
+        if image_candidates:
+            row = db.get(SharedData, "ocrCandidates")
+            if row is None:
+                row = SharedData(key="ocrCandidates", value={})
+                db.add(row)
+            old = dict((row.value or {}).get("items") or {})
+            old.update(image_candidates)
+            row.value = {"items": dict(list(old.items())[-2000:]), "updated": ref.isoformat()}
         db.commit()
         backlog = 0
         if details and ai_images and "saramin" not in blocked_src:
@@ -848,6 +862,7 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
             ai_done += extra_ai
             db.commit()
     out.update({"밀린 이미지 공고 처리": backlog, "저장한 새 공고": len(plan["new"]), "기존 공고 갱신": len(plan["upd"]), "상세 페이지 읽음": detail_done, "이미지 공고": image_n,
+                "OCR 실험 후보": len(image_candidates),
                 "AI로 읽은 이미지 공고": ai_done, "AI 사용": ai_use, "메모": notes[:20]})
     say(f"→ 새 공고 {len(plan['new'])}건 저장 · 기존 {len(plan['upd'])}건 갱신 · 상세 {detail_done}건 · 이미지 공고 {image_n}건 · AI {ai_done}건"
         + (f" · 토큰 {ai_use['tokens_in']}/{ai_use['tokens_out']} · ${ai_use['cost_usd']:.4f}" if ai_use["model"] else ""))

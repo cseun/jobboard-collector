@@ -26,25 +26,25 @@ tesseract --list-langs
 
 `ocr_lab_example.json`을 복사해 `id`, `posting_url`, 검색 조건, 이미지 `path` 또는 HTTPS `url`을 채운다. 여러 장이면 `images`에 모두 넣는다. 원본 수집에는 **공고 페이지 URL이 아니라 이미지 URL** 또는 로컬 이미지 파일을 사용한다. 채용보드 DB의 `이미지 주소` 목록을 이 형식으로 내보내면 된다.
 
-현재 서버의 이미지 공고를 쓰려면 이 스크립트를 서버의 `jobboard/api/scripts/ocr_lab.py`에 복사한 다음 API 컨테이너에서 읽기 전용으로 목록을 내보낼 수 있다. 기본은 이미지 주소가 있는 공고 전체이고, `--limit 15`로 15건만 고를 수도 있다. 이 목록에는 과거 수집기가 **이미지 공고로 인식해 URL을 저장한 공고만** 들어간다. 아직 발견하지 못한 이미지 공고를 확인하려면 별도 검색·수집 감사가 필요하다.
+기존 DB에 이미지 주소가 있는 공고는 서버 API 컨테이너에서 `export-db`로 내보낸다. 기본은 전체이고, `--limit 15`로 15건만 고를 수도 있다. 신규 수집에서 본문 검증으로 보류한 이미지 공고는 `export-candidates`로 별도 내보낸다. 두 목록 모두 이미지 파일 자체가 아닌 URL 목록이다.
 
 ```bash
 docker compose exec -T api python -m scripts.ocr_lab export-db --root /srv/files/ocr_lab --limit 15
-docker compose exec -T api python -m scripts.ocr_lab collect --manifest /srv/files/ocr_lab/db_manifest.json --root /srv/files/ocr_lab
+docker compose exec -T api python -m scripts.ocr_lab export-candidates --root /srv/files/ocr_lab
 ```
 
-`/srv/files`가 영구 볼륨인지 서버의 `docker-compose.yml`에서 확인한 뒤 사용한다. 서버로 스크립트를 복사하거나 실행하는 작업은 이 채팅에서는 수행하지 않았다.
+실제 이미지 다운로드와 OCR 실험은 PC에서 한다. 서버에서 `docker compose cp`로 JSON 목록을 꺼내고 PC에서 아래 명령을 실행한다.
 
 ```bash
-python tools/ocr_lab.py collect --manifest tools/ocr_lab_example.json --root work/ocr_lab_data
-python tools/ocr_lab.py candidates --root work/ocr_lab_data
+python api/scripts/ocr_lab.py collect --manifest docs/ocr_lab_example.json --root work/ocr_lab_data
+python api/scripts/ocr_lab.py candidates --root work/ocr_lab_data
 ```
 
 `candidates.json`의 공고별 이미지 장수, 최대 높이와 세로 비율로 후보를 좁힌다. 파일을 열어 작은 글씨, 표·다단, 아이콘을 확인한다. DB의 `--limit`는 후보 수 상한이다. 아래 예시 ID를 실제 공고 ID로 바꿔 조정용과 검증용을 고정한다. 동일 공고나 같은 해시의 이미지가 두 그룹에 걸치면 저장이 거부된다. 레이아웃이 비슷한 공고는 한 그룹에 배치한다.
 
 ```bash
-python tools/ocr_lab.py select --root work/ocr_lab_data --tune 101 102 --holdout 103
-python tools/ocr_lab.py run --root work/ocr_lab_data --split tune --engines tesseract --presets full,current,model_native --psms 3,6,11
+python api/scripts/ocr_lab.py select --root work/ocr_lab_data --tune 101 102 --holdout 103
+python api/scripts/ocr_lab.py run --root work/ocr_lab_data --split tune --engines tesseract --presets full,current,model_native --psms 3,6,11
 ```
 
 표본은 `sample.json`에 고정된다. 설정을 조정하는 동안 `--split tune`을 사용한다. 설정을 고른 뒤 동일한 설정으로 `--split holdout`을 실행한다. 표본을 바꾸려면 별도 실험 폴더를 사용한다.
@@ -56,7 +56,7 @@ python tools/ocr_lab.py run --root work/ocr_lab_data --split tune --engines tess
 지원 자격, 마감일, 급여처럼 반드시 보존해야 할 문구는 같은 폴더의 `<이미지번호>.critical.json`에 `{"phrases": ["경력 3년 이상", "2026.12.15 마감"]}` 형식으로 넣을 수 있다. 일반 CER가 낮아도 이 문구를 놓친 실행은 별도로 확인한다.
 
 ```bash
-python tools/ocr_lab.py evaluate --root work/ocr_lab_data --split tune
+python api/scripts/ocr_lab.py evaluate --root work/ocr_lab_data --split tune
 ```
 
 `evaluation_tune.json` 및 `evaluation_holdout.json`에는 해당 그룹에서 정답이 있는 실행이 기록된다. `raw`와 `merged_exact`를 대조해 병합으로 오류가 줄었는지 확인한다. 엄격한 CER, 공백·줄바꿈 차이를 줄인 CER, OCR 오류가 난 조각을 함께 기록한다. 실험 결과는 실험 폴더에 저장된다.

@@ -150,6 +150,23 @@ def export_db_manifest(root: Path, limit: int) -> None:
     print(f"Exported {len(manifest)} jobs to {root / 'db_manifest.json'}")
 
 
+def export_candidate_manifest(root: Path, limit: int) -> None:
+    """품질 검증으로 DB 공고 저장은 보류한 이미지의 주소를 PC OCR 실험용으로 내보낸다."""
+    from app.db import SessionLocal
+    from app.models import SharedData
+
+    with SessionLocal() as db:
+        row = db.get(SharedData, "ocrCandidates")
+        items = list(((row.value or {}).get("items") or {}).values()) if row else []
+    items.sort(key=lambda x: x.get("found_on", ""), reverse=True)
+    if limit:
+        items = items[:limit]
+    manifest = [{"id": item["id"], "posting_url": item["posting_url"], "query": "JobKorea OCR candidate",
+                 "images": [{"url": url} for url in item["images"]]} for item in items if item.get("images")]
+    dump(root / "candidate_manifest.json", manifest)
+    print(f"Exported {len(manifest)} image candidates to {root / 'candidate_manifest.json'}")
+
+
 def list_candidates(root: Path) -> None:
     jobs = load(root / "collection.json")["jobs"]
     candidates = []
@@ -365,7 +382,7 @@ def evaluate(root: Path, split: str | None = None) -> None:
 
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["export-db", "collect", "candidates", "select", "run", "evaluate"])
+    parser.add_argument("command", choices=["export-db", "export-candidates", "collect", "candidates", "select", "run", "evaluate"])
     parser.add_argument("--root", type=Path, required=True)
     parser.add_argument("--manifest", type=Path)
     parser.add_argument("--engines", default="tesseract")
@@ -379,6 +396,8 @@ def main() -> None:
     args = parser.parse_args()
     if args.command == "export-db":
         export_db_manifest(args.root, args.limit)
+    elif args.command == "export-candidates":
+        export_candidate_manifest(args.root, args.limit)
     elif args.command == "collect":
         if not args.manifest:
             parser.error("collect needs --manifest")
