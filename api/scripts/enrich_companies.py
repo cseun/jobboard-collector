@@ -75,12 +75,20 @@ def _val(db, key: str) -> dict:
     return dict(row.value or {}) if row is not None and isinstance(row.value, dict) else {}
 
 
+def eligible_job(j: Job, ref: date) -> bool:
+    """접수 중이며 서버에서 관련 없음으로 판정하지 않은 공고만 회사 보강 대상으로 삼는다."""
+    return (gaps.is_active(j) and (j.deadline_date is None or j.deadline_date >= ref)
+            and (j.raw or {}).get("관련도") != "×")
+
+
 def plan(db, ref: date, limit: int) -> dict:
     """채울 회사(새 회사 → 오래된 회사 순). {'new': [(csn, 회사명)], 'stale': [...]}
     확인한 날(companiesChecked)·못 읽은 날(companiesMiss)은 보드가 읽는 companies 밖의 별도 칸에 둡니다(보드 화면에 영향 없음)."""
     comps, miss, checked = _val(db, "companies"), _val(db, "companiesMiss"), _val(db, "companiesChecked")
     names: dict[str, str] = {}
     for j in db.execute(select(Job).order_by(Job.id.desc())).scalars():
+        if not eligible_job(j, ref):
+            continue
         csn = (j.raw or {}).get("csn")
         if csn and csn not in names:
             names[csn] = j.company
@@ -101,7 +109,7 @@ def fill_jobs(db, csn: str, comp: dict) -> int:
     biz = next((t[5:].strip() for t in comp.get("det", []) if t.startswith("사업내용 ")), "")
     for j in db.execute(select(Job)).scalars():
         raw = j.raw or {}
-        if raw.get("csn") != csn:
+        if raw.get("csn") != csn or not eligible_job(j, today_kst()):
             continue
         ch = {}
         if head and str(raw.get("규모·사원수") or "").strip() in ("", "미확인", "-"):
@@ -122,6 +130,8 @@ def find_targets(db, ref: date, limit: int) -> list[tuple[str, str, str]]:
     amb = _val(db, "companiesFind")
     seen: dict[str, tuple[str, str, int]] = {}
     for j in db.execute(select(Job).order_by(Job.id.desc())).scalars():
+        if not eligible_job(j, ref):
+            continue
         raw = j.raw or {}
         key = short_name(j.company)
         if raw.get("csn") or not key or key in seen:
@@ -129,7 +139,7 @@ def find_targets(db, ref: date, limit: int) -> list[tuple[str, str, str]]:
         done = amb.get(key, {}).get("date")
         if done and date.fromisoformat(done) + timedelta(days=MISS_DAYS) > ref:
             continue
-        seen[key] = (j.company, str(raw.get("근무 위치") or j.location or ""), 0 if gaps.is_active(j) else 1)
+        seen[key] = (j.company, str(raw.get("근무 위치") or j.location or ""), 0)
     ordered = sorted(seen.values(), key=lambda x: x[2])
     return [(c, h, "") for c, h, _ in ordered[:limit]]
 
@@ -138,7 +148,7 @@ def set_csn(db, key: str, csn: str, how: str) -> int:
     n = 0
     for j in db.execute(select(Job)).scalars():
         raw = j.raw or {}
-        if short_name(j.company) == key and not raw.get("csn"):
+        if eligible_job(j, today_kst()) and short_name(j.company) == key and not raw.get("csn"):
             j.raw = {**raw, "csn": csn, "csn 출처": how}
             n += 1
     return n

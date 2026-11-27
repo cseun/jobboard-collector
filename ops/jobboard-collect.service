@@ -6,11 +6,11 @@ After=network-online.target docker.service
 [Service]
 Type=oneshot
 WorkingDirectory=/home/ubuntu/jobboard
-Environment=COLLECT_SOURCE=saramin
-Environment="COLLECT_ARGS=--apply --details --ai-images 0 --no-judge --no-watch --max-pages 1 --max-requests 2000"
-Environment=COMPANY_MAX=10
+Environment=COLLECT_SOURCE=saramin,jobkorea
+Environment="COLLECT_ARGS=--apply --details --ai-images 0 --judge --no-watch --max-pages 1 --max-requests 2000"
+Environment=COMPANY_MAX=50
 Environment=GEO_MAX=0
-Environment=FIND_MAX=10
+Environment=FIND_MAX=50
 Environment=NEWS_MAX=0
 Environment=REFRESH_MAX=50
 Environment=FILL_MAX=10

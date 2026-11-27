@@ -82,7 +82,9 @@ const jobMap = (r, i) => {
     get score() { return (this.fit === 'high' ? 4 : this.fit === 'mid' ? 2 : 0) + this._mt.pts; } };
 };
 const jobs = (DATA.jobs || []).map(jobMap);
-const openJobs = jobs.filter(j => j.dd === null || j.dd >= 0);
+const isClosed = j => /^(?:마감|지원\s*마감|접수\s*마감|종료|closed)/i.test(plain(j.r['접수 상태']).trim()) || (j.dd !== null && j.dd < 0);
+const openJobs = jobs.filter(j => !isClosed(j));
+const closedJobs = jobs.filter(isClosed);
 // ===== 🚫 공고 제외하기 (내 계정에만 저장) =====
 const HID = new Set((() => { try { const v = JSON.parse(localStorage.getItem('ud-hidden') || 'null'); return v && Array.isArray(v.v) ? v.v : []; } catch { return []; } })());
 const hidKey = j => (typeof prepKey === 'function' ? prepKey(j) : '') || (j.company + '|' + j.title);
@@ -127,7 +129,7 @@ const empOf = j => { if (j._emp) return j._emp; const r = j.r || {}, t = plain([
   return (j._emp = intern ? '인턴' : con && !reg ? '계약직' : con && reg ? '정규직·계약직' : reg ? '정규직' : '미확인'); };
 const EMP_F = { reg: ['💼 인턴·계약직 빼기', e => e !== '인턴' && e !== '계약직'], ic: ['💼 인턴·계약직만', e => e === '인턴' || e === '계약직' || e === '정규직·계약직'] };
 const salOf = j => j.avg || 0;
-let HID_SHOW = false, HID_LAST = '';
+let HID_SHOW = false, CLOSED_SHOW = false, HID_LAST = '';
 const byDue = (a, b) => (a.dd ?? 1e4) - (b.dd ?? 1e4) || b.score - a.score || a.i - b.i;
 const shortDate = s => { const m = String(s ?? '').match(/(\d{4})-(\d{2})-(\d{2})/); return m ? `${+m[2]}/${+m[3]}` : (String(s ?? '').match(/^\d{1,2}\/\d{1,2}/) || [''])[0] || '미표기'; };
 const countryOf = s => { const x = plain(s); return /일본|도쿄/.test(x) ? '일본' : /UAE|두바이/.test(x) ? 'UAE' : /미국|샌프란|로스앤젤레스|뉴욕|텍사스|워싱턴|매사추세츠/.test(x) ? '미국' : /독일|스위스|스웨덴|네덜란드|유럽|뮌헨|취리히|스톡홀름|베스트/.test(x) ? '유럽' : /베트남|하노이|호치민|인도|싱가포르/.test(x) ? '아시아(일본 외)' : '기타·미확인'; };
@@ -271,9 +273,10 @@ function pgWire() {
   document.querySelectorAll('#view .pg-sz').forEach(x => x.onchange = () => { PG.size = +x.value; store.set('pgsz', String(PG.size)); PG.p = 1; vDomestic(); });
 }
 function vDomestic() {
-  const regions = [...new Set(jobs.map(j => j.region))].sort((a, b) => a.localeCompare(b, 'ko'));
+  const visibleJobs = CLOSED_SHOW ? closedJobs : openJobs;
+  const regions = [...new Set(visibleJobs.map(j => j.region))].sort((a, b) => a.localeCompare(b, 'ko'));
   const q = state.q.trim().toLowerCase();
-  const areaCount = {}; jobs.filter(j => !state.region || j.region === state.region).forEach(j => areaCount[j.area] = (areaCount[j.area] || 0) + 1);
+  const areaCount = {}; visibleJobs.filter(j => !state.region || j.region === state.region).forEach(j => areaCount[j.area] = (areaCount[j.area] || 0) + 1);
   const areas = Object.keys(areaCount).sort((a, b) => areaCount[b] - areaCount[a] || a.localeCompare(b, 'ko'));
   if (state.area && !areaCount[state.area]) state.area = '';
   const catsOf = j => j.r['분야'] || ['미분류'], rolesOf = j => j.r['직무 분류'] || ['미분류'];
@@ -294,8 +297,8 @@ function vDomestic() {
     const x = d.querySelector('[data-msx]'); if (x) x.onclick = () => { state[key] = ''; store.set(key, ''); window.__msOpen[id] = true; vDomestic(); };
   };
   const dueOk = j => !state.due || (state.due === '7' ? (j.dd !== null && j.dd >= 0 && j.dd <= 7) : j.dd === +state.due.slice(1));
-  const nHid = jobs.filter(isHid).length;
-  const base = jobs.filter(j => (HID_SHOW ? isHid(j) : !isHid(j)) && dueOk(j) && (!state.high || j.fit === 'high') && (!state.region || j.region === state.region) && (!state.area || j.area === state.area) && (!q || JSON.stringify(j.r).toLowerCase().includes(q)));
+  const nHid = visibleJobs.filter(isHid).length;
+  const base = visibleJobs.filter(j => (HID_SHOW ? isHid(j) : !isHid(j)) && dueOk(j) && (!state.high || j.fit === 'high') && (!state.region || j.region === state.region) && (!state.area || j.area === state.area) && (!q || JSON.stringify(j.r).toLowerCase().includes(q)));
   const catN = {}, roleN = {}; base.filter(j => selHas(rolesOf(j), state.role)).forEach(j => catsOf(j).forEach(c => catN[c] = (catN[c] || 0) + 1)); base.filter(j => selHas(catsOf(j), state.cat)).forEach(j => rolesOf(j).forEach(c => roleN[c] = (roleN[c] || 0) + 1));
   const cats = (DATA.catOrder || []).concat(['미분류']).filter(c => catN[c] || selOn(state.cat, c)), roles = (DATA.roleOrder || []).filter(c => c !== '필드엔지니어').concat(['필드엔지니어', '미분류']).filter(c => roleN[c] || selOn(state.role, c));
   const EDU = { no4: ['🎓 대졸·석사 요건 제외', e => !/4년제 요건|^(석사|박사) 요건/.test(e)], jc: ['🎓 초대졸 지원 가능 확인만', e => /초대졸|고졸|무관/.test(e)], free: ['🎓 학력 무관만', e => /무관|고졸/.test(e)] };
@@ -327,7 +330,8 @@ function vDomestic() {
   else if (state.sort === 'posted') groups = [['오늘 등록', j => j.posted === today], ['최근 7일', j => j.posted !== null && j.posted < today && today - j.posted <= 7 * 864e5], ['최근 30일', j => j.posted !== null && today - j.posted > 7 * 864e5 && today - j.posted <= 30 * 864e5], ['30일 넘음', j => j.posted !== null && today - j.posted > 30 * 864e5], ['등록 날짜 미확인', j => j.posted === null]];
   else if (state.sort === 'seen') groups = [['오늘 수집', j => j.seen === today], ['최근 7일', j => j.seen !== null && j.seen < today && today - j.seen <= 7 * 864e5], ['최근 30일', j => j.seen !== null && today - j.seen > 7 * 864e5 && today - j.seen <= 30 * 864e5], ['30일 넘음', j => j.seen !== null && today - j.seen > 30 * 864e5], ['수집 날짜 미확인', j => j.seen === null]];
   else groups = [['7일 안에 마감', j => j.dd !== null && j.dd >= 0 && j.dd <= 7], ['8~30일', j => j.dd > 7 && j.dd <= 30], ['31일 이후', j => j.dd > 30], ['상시·미정', j => j.dd === null], ['마감일 지남(다음 조사 때 정리)', j => j.dd !== null && j.dd < 0]];
-  const pgl = pgPlan(list, groups, [state.q, state.region, state.area, state.role, state.cat, state.career, state.careerN, state.edu, state.wel, state.mine, state.emp, state.salMin, state.salUnk, state.near, state.high, state.due, state.sort, HID_SHOW]);
+  if (CLOSED_SHOW) groups = [['마감 공고', () => true]];
+  const pgl = pgPlan(list, groups, [state.q, state.region, state.area, state.role, state.cat, state.career, state.careerN, state.edu, state.wel, state.mine, state.emp, state.salMin, state.salUnk, state.near, state.high, state.due, state.sort, HID_SHOW, CLOSED_SHOW]);
   const FOPEN = store.get('fOpen', '0') === '1', nAdv = [state.high, state.cat, state.edu, state.wel, state.near, !state.region && state.area, state.emp, state.salMin].filter(Boolean).length;
   $('#view').innerHTML = `<div class="summary">
       <div class="hot sum-btn" role="button" tabindex="0" data-jl="7|0|due" title="7일 안에 마감하는 공고만 보기"><b>${openJobs.filter(j => j.dd !== null && j.dd >= 0 && j.dd <= 7).length}</b><span>7일 안에 마감 ›</span></div>
@@ -341,7 +345,7 @@ function vDomestic() {
       <select id="careerF" aria-label="경력" data-def="all">${[['entry', `신입·경력무관만 (${base.filter(careerEntry).length})`], ['n', `경력 ${state.careerN}년 이하까지 (${base.filter(j => careerWithin(j, +state.careerN || 3)).length})`], ['all', `경력 공고도 모두 (${base.length})`]].map(([v, t]) => `<option value="${v}" ${v === state.career ? 'selected' : ''}>${t}</option>`).join('')}</select>${state.career === 'n' ? `<select id="careerN" aria-label="경력 연차" data-def="3">${[1, 2, 3, 4, 5, 7, 10].map(n => `<option value="${n}" ${String(n) === String(state.careerN) ? 'selected' : ''}>경력 ${n}년 이하</option>`).join('')}</select>` : ''}
       ${mineSel('mine', state.mine, base)}
       <button class="chip-toggle" id="due7" aria-pressed="${state.due === '7'}">⏰ 7일 안 마감</button>${state.due && state.due[0] === 'd' ? `<button class="chip-toggle" id="dueX" aria-pressed="true">📅 ${dueLabel(+state.due.slice(1))} 마감만 ✕</button>` : ''}
-      <button class="chip-toggle f-more" id="fMore" aria-expanded="${FOPEN}" aria-controls="fAdv">⚙️ 상세 필터${nAdv ? ` <b class="f-n">${nAdv}</b>` : ''} ${FOPEN ? '▴' : '▾'}</button>${nAdv || state.career !== 'all' || state.role || state.region || state.mine || state.due || state.q.trim() || HID_SHOW ? '<button class="chip-toggle f-reset" id="catReset">↺ 필터 초기화</button>' : ''}</div>
+      <button class="chip-toggle f-more" id="fMore" aria-expanded="${FOPEN}" aria-controls="fAdv">⚙️ 상세 필터${nAdv ? ` <b class="f-n">${nAdv}</b>` : ''} ${FOPEN ? '▴' : '▾'}</button>${nAdv || state.career !== 'all' || state.role || state.region || state.mine || state.due || state.q.trim() || HID_SHOW || CLOSED_SHOW ? '<button class="chip-toggle f-reset" id="catReset">↺ 필터 초기화</button>' : ''}</div>
     <div class="filters f-adv" id="fAdv" ${FOPEN ? '' : 'hidden'}>
       <button class="chip-toggle" id="high" aria-pressed="${state.high}">적합도 높음만</button>
       ${state.region ? '' : `<select id="area" aria-label="상세 지역">${['', ...areas].map(x => `<option value="${esc(x)}" ${x === state.area ? 'selected' : ''}>${x ? `${esc(x)} (${areaCount[x]})` : '상세 지역 전체'}</option>`).join('')}</select>`}
@@ -352,8 +356,10 @@ function vDomestic() {
       <select id="salF" aria-label="연봉 하한" title="공고에 적힌 급여, 없으면 사람인 1년차 연봉 추정으로 비교해요">${[['', '💰 연봉 하한 없음'], ['3000', '💰 3,000만↑'], ['3500', '💰 3,500만↑'], ['4000', '💰 4,000만↑'], ['4500', '💰 4,500만↑']].map(([v, t]) => `<option value="${v}" ${v === state.salMin ? 'selected' : ''}>${t}</option>`).join('')}</select>
       ${state.salMin ? `<button class="chip-toggle" id="salUnk" aria-pressed="${state.salUnk}" title="급여·연봉 정보가 없는 공고도 함께 보여요">연봉 모르는 공고도 보기 (${base.filter(j => !salOf(j)).length})</button>` : ''}
       <select id="wel" aria-label="복지">${[['', '🎁 복지 전체'], ...PF_WEL.map(([k, re]) => [k, `${k} (${base.filter(j => re.test(pfWelText(j))).length})`])].map(([v, t]) => `<option value="${esc(v)}" ${v === state.wel ? 'selected' : ''}>${esc(t)}</option>`).join('')}</select>
+      <button class="chip-toggle" id="closedShow" aria-pressed="${CLOSED_SHOW}" title="마감된 공고만 따로 봐요">📦 마감 공고 ${closedJobs.length}</button>
       ${nHid || HID_SHOW ? `<button class="chip-toggle" id="hidShow" aria-pressed="${HID_SHOW}" title="숨긴 회사·제외한 공고만 모아 봐요">🚫 숨긴 공고 ${nHid}</button>` : ''}
 </div>
+    ${CLOSED_SHOW ? '<div class="warn-bar"><b>📦 마감 공고만 보고 있어요</b><span class="note">기본 목록에는 접수 중 공고만 표시됩니다. 상세 필터의 마감 공고 버튼을 다시 누르면 돌아가요.</span></div>' : ''}
     ${HID_SHOW ? '<div class="warn-bar"><b>🚫 숨긴 회사·제외한 공고만 보고 있어요</b><span class="note">관련 없다고 AI가 판정한 공고(제목 판정 ×)도 여기에 모여 있어요. 카드를 열어 "⋯ → ↩ 제외 취소"를 누르면 다시 목록에 나와요. 상세 필터의 버튼을 다시 누르면 전체 목록으로 돌아가요.</span></div>' + hidCoPanel() : ''}
     <div class="filters f-sort"><b class="f-cnt">${list.length}개</b><label class="note">정렬 <select id="sortSel" aria-label="정렬">${Object.entries(sorts).map(([k, [n]]) => `<option value="${k}" ${state.sort === k ? 'selected' : ''}>${n}</option>`).join('')}</select></label></div>
     ${(state.sort === 'pf' || state.sort === 'pfh') && !haveCount() ? '<div class="empty">지원 전략·요구 일치율을 보려면 <a href="#pf" data-goto="pf">🎯 내 기준</a>에서 <b>내가 가진 기술·조건</b>을 골라 주세요(내 정보에서 가져오기 버튼도 있어요).</div>' : state.sort === 'pfw' && !wantCount() ? '<div class="empty"><a href="#pf" data-goto="pf">🎯 내 기준</a>에서 원하는 직무·기술·복지를 골라 주세요.</div>' : ''}
@@ -375,9 +381,10 @@ function vDomestic() {
   if ($('#salUnk')) $('#salUnk').onclick = () => { state.salUnk = !state.salUnk; store.set('salUnk', state.salUnk ? '1' : '0'); vDomestic(); };
   if ($('#nearF')) $('#nearF').onchange = e => { state.near = e.target.value; store.set('nearF', state.near); vDomestic(); };
   if ($('#hidShow')) $('#hidShow').onclick = () => { HID_SHOW = !HID_SHOW; HID_LAST = ''; vDomestic(); };
+  $('#closedShow').onclick = () => { CLOSED_SHOW = !CLOSED_SHOW; state.due = ''; store.set('due', ''); vDomestic(); };
   pgWire();
   if ($('#hidUndo')) $('#hidUndo').onclick = () => { if (HID_LAST.startsWith('회사: ')) { const n = HID_LAST.slice(4); HIDCO.delete(coKey(n)); hidCoSave(); } else { HID.delete(HID_LAST_KEY); hidSave(); } HID_LAST = ''; vDomestic(); };
-  if ($('#catReset')) $('#catReset').onclick = () => { state.career = 'all'; store.set('career', 'all'); state.cat = state.role = state.edu = state.wel = state.near = state.region = state.area = state.emp = state.salMin = state.mine = state.due = state.q = ''; state.high = false; HID_SHOW = false; ['cat', 'role', 'edu', 'wel', 'nearF', 'region', 'area', 'emp', 'salMin', 'mine', 'due', 'q'].forEach(k => store.set(k, '')); store.set('high', '0'); vDomestic(); };
+  if ($('#catReset')) $('#catReset').onclick = () => { state.career = 'all'; store.set('career', 'all'); state.cat = state.role = state.edu = state.wel = state.near = state.region = state.area = state.emp = state.salMin = state.mine = state.due = state.q = ''; state.high = false; HID_SHOW = CLOSED_SHOW = false; ['cat', 'role', 'edu', 'wel', 'nearF', 'region', 'area', 'emp', 'salMin', 'mine', 'due', 'q'].forEach(k => store.set(k, '')); store.set('high', '0'); vDomestic(); };
   $('#fMore').onclick = () => { store.set('fOpen', store.get('fOpen', '0') === '1' ? '0' : '1'); vDomestic(); };
   $('#sortSel').onchange = e => { state.sort = e.target.value; store.set('sort', state.sort); vDomestic(); };
   $('#high').onclick = () => { state.high = !state.high; store.set('high', state.high ? '1' : '0'); vDomestic(); };
@@ -1820,7 +1827,7 @@ function coStatus(name) {
   return { a, label: s === 'bad' ? '⚪ 지원 · 탈락' : s === 'pass' ? '🟢 합격 · 진행 중' : s === 'wait' ? '🟢 지원 중' : '지원 기록', cls: s === 'bad' ? 'bad' : s ? 'high' : '' };
 }
 function vCompany(name) {
-  const js = jobs.filter(j => sameCo(j.company, name)).sort(byDue);
+  const js = openJobs.filter(j => sameCo(j.company, name)).sort(byDue);
   const os = overseas.filter(o => sameCo(o.company, name));
   const disp = (js[0] && js[0].company) || (os[0] && os[0].company) || name;
   const d = coData(disp), st = coStatus(disp), iv = ivOf(disp), lt = letterOf(disp);
@@ -1849,7 +1856,7 @@ function vCompany(name) {
   $('#view').innerHTML = `
   <div class="mk-row"><button class="mk-btn" id="coBack">← 돌아가기</button></div>
   <section class="row co-hero">
-    <div class="top"><h2 style="margin:0;font-size:20px">${esc(plain(disp))}</h2>${st ? `<span class="pill ${st.cls}">${esc(st.label)}</span>` : js.some(j => j.dd === null || j.dd >= 0) ? '<span class="pill new">📝 지원 예정 · 접수 중</span>' : ''}</div>
+    <div class="top"><h2 style="margin:0;font-size:20px">${esc(plain(disp))}</h2>${st ? `<span class="pill ${st.cls}">${esc(st.label)}</span>` : js.length ? '<span class="pill new">📝 지원 예정 · 접수 중</span>' : ''}</div>
     <div class="why">🏢 ${esc(descs.join(' / ') || det['사업내용'] || (mk ? MOCK.companies[mk].company.split('\n')[0].slice(0, 160) + '…' : '') || (os[0] ? plain(os[0].r['검증 내용']).slice(0, 160) : '') || '회사 설명 미확인')}</div>
     <div class="tags">${[est && '📅 ' + est, emp && '👥 ' + emp, sales && '💵 매출 ' + sales, kind && '🏷 ' + kind, sizes[0] && !emp ? '🏷 ' + sizes[0] : '', addr && '📍 ' + addr].filter(Boolean).map(x => `<span class="pill">${esc(x)}</span>`).join('')}</div>
     <div class="links">${ext.map(([t, u]) => `<a href="${esc(u)}" target="_blank" rel="noopener">${esc(t)}</a>`).join('')}${coStarBtn(disp, true)}${hidCoBtn(disp)}</div>
@@ -1899,7 +1906,7 @@ function cmpRows() {
   jobs.forEach(j => { const k = NJ(j.company); (by[k] = by[k] || []).push(j); });
   return Object.values(by).map(js => {
     const name = js[0].company, p = jpOf(name);
-    const open = js.filter(j => j.dd === null || j.dd >= 0), dds = open.map(j => j.dd).filter(x => x !== null);
+    const open = js.filter(j => !isClosed(j)), dds = open.map(j => j.dd).filter(x => x !== null);
     const fitRank = { high: 2, mid: 1 };
     return { name, p, js, fit: js.reduce((m, j) => Math.max(m, fitRank[j.fit] || 0), 0), dd: dds.length ? Math.min(...dds) : null,
       pw: Math.max(-1, ...js.map(j => { const x = wantScore(j); return x ? x.pct : -1; })), ph: Math.max(-1, ...js.map(j => { const x = hireScore(j); return x && x.pct !== null ? x.pct : -1; })), sal: Math.max(0, ...js.map(j => j.avg || 0)), salTxt: salShort(js[0].r), cats: [...new Set(js.flatMap(j => j.r['분야'] || []))] };
@@ -5207,6 +5214,7 @@ function sideSync(v) {
 document.addEventListener('click', e => { const b = e.target.closest && e.target.closest('#upGh'); if (!b) return; const t = document.getElementById('upText'); if (!t) return; if (!t.value.trim()) t.value = '[GitHub]\n저장소: github.com/아이디/저장소이름\n설명: \n사용 기술: \n내가 한 일: \n\n(README 내용을 아래에 붙여 넣으면 더 정확해요)\n'; t.focus(); const m = document.getElementById('upMsg'); if (m) m.textContent = 'ℹ️ 이 화면은 GitHub에 직접 접속하지 못해요. 저장소 이름·README를 붙여 넣고 "AI로 읽어서 채우기"를 누르면 프로젝트·기술로 정리해요.'; });
 // ===== 공고 바로가기(필터 걸고 이동) =====
 function goJobs(o) {
+  CLOSED_SHOW = false;
   ['q', 'region', 'area', 'cat', 'role', 'edu', 'wel'].forEach(k => { state[k] = ''; store.set(k, ''); });
   state.high = !!o.high; store.set('high', state.high ? '1' : '0');
   state.due = o.due || ''; store.set('due', state.due);
@@ -5222,7 +5230,7 @@ const CST = { star: store.get('cstar', '0') === '1', q: store.get('cq', ''), cat
 function coList() {
   const M = new Map();
   jobs.forEach(j => { const k = coKey(j.company); if (!k) return; const c = M.get(k) || { k, name: j.company, jobs: [], cats: new Set(), area: j.area, csn: '' }; c.jobs.push(j); (j.r['분야'] || []).forEach(x => c.cats.add(x)); if (j.r.csn && !c.csn) c.csn = j.r.csn; M.set(k, c); });
-  return [...M.values()].map(c => { const info = COS[c.csn] || null, jp = jpOf(c.name), open = c.jobs.filter(j => j.dd === null || j.dd >= 0);
+  return [...M.values()].map(c => { const info = COS[c.csn] || null, jp = jpOf(c.name), open = c.jobs.filter(j => !isClosed(j));
     const sum = (info && info.sum) || [], emp = ((sum.find(s => /사원수/.test(s)) || '').match(/[\d,]+\s*명/) || [''])[0], rev = (sum.find(s => /매출/.test(s)) || '').replace(/\s*매출액?/, '').trim(), est = (sum.find(s => /설립/.test(s)) || '').replace(/\s*설립/, '').trim();
     const wel = info && info.wel ? info.wel.map(w => w[1]).join(' ') : '';
     const tags = [[/육아휴직|남성출산휴가|산전 후 휴가|어린이집|보육|자녀학자금/, '👶 육아'], [/기숙사|사택/, '🏠 기숙사'], [/재택|탄력|유연근무|시차출퇴근/, '💻 유연근무'], [/통근버스/, '🚌 통근버스'], [/구내식당|식사 제공|점심식사/, '🍚 식사']].filter(([re]) => re.test(wel)).map(([, t]) => t);
@@ -5625,7 +5633,7 @@ async function poolLoad() {
   let snap; try { snap = await UD.db.collection('pool').get(); } catch { return; }
   const have = new Set(jobs.map(j => jobKey(j.r))); let n = 0;
   (snap.docs || []).map(poolRead).forEach(d => { const row = poolClean(d); if (!row) return; const k = jobKey(row); if (have.has(k)) return; have.add(k);
-    const j = jobMap(row, jobs.length); jobs.push(j); if (j.dd === null || j.dd >= 0) openJobs.push(j); n++; });
+    const j = jobMap(row, jobs.length); jobs.push(j); if (isClosed(j)) closedJobs.push(j); else openJobs.push(j); n++; });
   POOL.n = n;
   if (n && ['week', 'domestic', 'picks', 'near', 'cmp'].includes(show.cur)) { const y = scrollY; show(show.cur); scrollTo(0, y); }
 }

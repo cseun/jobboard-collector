@@ -175,13 +175,33 @@ SOURCES = {
 
 
 def jobkorea_parse_detail(html: str) -> dict:
-    """잡코리아 공고 상세 → 본문 글자와, 본문이 따로 들어 있는 iframe 주소(있으면)."""
+    """잡코리아 채용상세의 srcdoc 본문만 읽는다. 바깥 페이지의 추천공고·후기는 제외한다."""
     soup = BeautifulSoup(html, "html.parser")
     ifr = next((f.get("src") for f in soup.select("iframe[src]") if re.search(r"GI_Read|Ifrm|Comt", f.get("src", ""))), "")
-    for t in soup.select("script,style,noscript"):
-        t.decompose()
-    text = re.sub(r"\n{3,}", "\n\n", (soup.body or soup).get_text("\n", strip=True))
-    return {"text": text, "iframe": ifr}
+    frames = [BeautifulSoup(f.get("srcdoc"), "html.parser") for f in soup.select("iframe[srcdoc]") if f.get("srcdoc")]
+    images = []
+    parts = []
+    for frame in frames:
+        for img in frame.select("img[src]"):
+            src = img.get("src", "").strip()
+            if src:
+                images.append("https:" + src if src.startswith("//") else src)
+        for t in frame.select("script,style,noscript"):
+            t.decompose()
+        parts.append(frame.get_text("\n", strip=True))
+    text = re.sub(r"\n{3,}", "\n\n", "\n".join(parts)).strip()
+    # 채용상세가 없는 구형 화면도 바깥 페이지 전체를 본문으로 간주하지 않는다.
+    lines = [s.strip() for s in soup.get_text("\n", strip=True).splitlines() if s.strip()]
+    fields = {}
+    for label, key in (("사원수", "사원수"), ("기업구분", "기업형태"), ("산업(업종)", "업종"), ("위치", "주소")):
+        try:
+            i = lines.index(label, lines.index("기업 정보"))
+            fields[key] = lines[i + 1]
+        except (ValueError, IndexError):
+            pass
+    writer = soup.select_one('meta[name="writer"]')
+    return {"text": text, "iframe": ifr, "images": images, "is_image": bool(images) and len(text) < 80,
+            "company_name": (writer.get("content") or "").strip() if writer else "", "company_fields": fields}
 
 
 # ───────────────────── 마감 확인(이미 저장한 공고를 다시 볼 때) ─────────────────────

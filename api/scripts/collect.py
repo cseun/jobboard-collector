@@ -37,7 +37,7 @@ from app.models import CollectRun, Document, Job, SharedData, User, utcnow
 from app.routers import ai as ai_mod
 from scripts import sync_sheet as ss
 from scripts import title_judge as tj
-from scripts.collect_sources import (SOURCES, company_headcount, saramin_company_parse,
+from scripts.collect_sources import (SOURCES, company_headcount, jobkorea_parse_detail, jobkorea_status, saramin_company_parse,
                                      saramin_company_url, saramin_next, saramin_parse,
                                      saramin_status, wanted_parse_detail)
 from scripts.text_requirements import parse_requirements, parse_sections
@@ -138,7 +138,7 @@ def recruiter_company_reason(company: str, comp: dict | None) -> str:
 
 def quality_reason(p: dict, d: dict, comp: dict | None, live: dict | None, ref: date) -> str:
     """상세·회사 정보와 실제 마감을 검증한 공고만 저장한다."""
-    if p.get("src", "saramin") != "saramin":
+    if p.get("src", "saramin") not in ("saramin", "jobkorea"):
         return "지원 사이트 상세 검증 미구현"
     info = d.get("_detail")
     if not info or info.get("is_image"):
@@ -629,7 +629,24 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
         key = None
         used_today = ai_today(db, ref) if ai_images else 0
         for p, d in zip(new, rows):
-            if not details or p.get("src") == "jobkorea" or p.get("src", "saramin") in blocked_src:      # 잡코리아는 상세를 아직 읽지 않음(목록 정보만 저장)
+            if not details or p.get("src", "saramin") in blocked_src:
+                continue
+            if p.get("src") == "jobkorea":
+                try:
+                    html = fetch(SOURCES["jobkorea"].view(p["id"]))
+                    info = jobkorea_parse_detail(html)
+                except Blocked as e:
+                    out["중단"] = cr["blocked"] = str(e)
+                    blocked_src.add("jobkorea")
+                    continue
+                except httpx.HTTPError as e:
+                    notes.append(f"{p['company']}: 잡코리아 상세 읽기 실패({type(e).__name__})")
+                    continue
+                detail_done += 1
+                d["_detail"] = info
+                d["_live"] = jobkorea_status(html)
+                if info.get("is_image"):
+                    image_n += 1
                 continue
             if p.get("src") == "wanted":
                 try:
@@ -713,8 +730,12 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
             for p, d in zip(new, rows):
                 info = d.get("_detail")
                 csn = p.get("csn")
-                if p.get("src", "saramin") != "saramin" or not csn or not info or info.get("is_image"):
+                src = p.get("src", "saramin")
+                if src not in ("saramin", "jobkorea") or (src == "saramin" and not csn) or not info:
                     rejected["지원 사이트·회사 번호·텍스트 상세 확인 불가"] += 1
+                    continue
+                if info.get("is_image"):
+                    rejected["이미지 본문 OCR 검증 대기"] += 1
                     continue
                 sections = parse_sections(info.get("text") or "")
                 if not sections.get("담당 업무") or not sections.get("필수"):
@@ -725,16 +746,24 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                     rejected[unrelated] += 1
                     continue
                 try:
-                    live = saramin_status(fetch(SOURCES["saramin"].view(p["id"])))
+                    live = d.get("_live") if src == "jobkorea" else saramin_status(fetch(SOURCES["saramin"].view(p["id"])))
                     if not live or (live.get("due") and live["due"] < ref) or (
                         not live.get("due") and live.get("kind") not in ("상시", "채용시")
                     ):
                         rejected["실제 접수 상태 미확인 또는 마감"] += 1
                         continue
-                    if csn not in checked_companies:
-                        cached = known_companies.get(csn)
-                        checked_companies[csn] = cached if cached and cached.get("fields") else saramin_company_parse(fetch(saramin_company_url(csn)))
-                    comp = checked_companies[csn]
+                    if src == "jobkorea":
+                        # 채용 회사명과 페이지 작성자명이 다르면 대행·잘못 연결된 상세일 수 있다.
+                        norm = lambda s: re.sub(r"[^가-힣a-z0-9]", "", str(s).lower().replace("주식회사", "").replace("㈜", ""))
+                        if not info.get("company_name") or norm(info["company_name"]) != norm(p["company"]):
+                            rejected["잡코리아 회사명 불일치"] += 1
+                            continue
+                        comp = {"fields": info.get("company_fields") or {}}
+                    else:
+                        if csn not in checked_companies:
+                            cached = known_companies.get(csn)
+                            checked_companies[csn] = cached if cached and cached.get("fields") else saramin_company_parse(fetch(saramin_company_url(csn)))
+                        comp = checked_companies[csn]
                 except Blocked as e:
                     out["중단"] = str(e)
                     rejected["사이트 차단"] += 1
@@ -751,7 +780,8 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                     d.pop("due_state", None)
                 elif live.get("kind") in ("상시", "채용시"):
                     d["due_state"] = live["kind"]
-                company_updates[csn] = comp
+                if csn:
+                    company_updates[csn] = comp
                 approved.append((p, d))
             new, rows = [p for p, _ in approved], [d for _, d in approved]
             out["품질 검증"] = {"저장 후보": len(new), "제외": dict(rejected)}
@@ -794,7 +824,7 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                 raw["회사 설명·제품"] = company_summary(d["_company"])[:300]
                 raw["규모·사원수"] = company_headcount(d["_company"].get("sum") or [])
                 raw["회사 정보"] = d["_company"].get("fields") or {}
-                raw["회사 정보 출처"] = saramin_company_url(d["csn"])
+                raw["회사 정보 출처"] = saramin_company_url(d["csn"]) if d.get("csn") else d["url"]
         ss.apply_plan(db, plan)
         if company_updates:
             row = db.get(SharedData, "companies")
