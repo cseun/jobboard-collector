@@ -441,6 +441,8 @@ def apply_judge(new: list[dict], skipped: dict, key: str, model: str = tj.JUDGE_
     info = {"model": model, "판정한 공고": len(target), "○": cnt.get("○", 0), "△": cnt.get("△", 0), "필": cnt.get("필", 0), "×": cnt.get("×", 0), "판정 안 하고 남김": max(0, len(new) - max_n),
             "실패한 묶음": res["failed"], "tokens_in": res["tokens_in"], "tokens_out": res["tokens_out"], "cost_usd": round(res["cost_usd"], 4),
             "× 예시": ex["×"], "△ 예시": ex["△"]}
+    if res.get("실패 이유"):
+        info["실패 이유"] = res["실패 이유"]
     return keep, rel, drops, info
 
 
