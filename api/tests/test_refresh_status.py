@@ -33,6 +33,8 @@ def test_status_parsers():
     assert cs.saramin_status(SA("2026-12-09")) == {"due": date(2026, 12, 9), "kind": "date"}
     assert cs.saramin_status(SA("채용시"))["kind"] == "채용시" and cs.saramin_status(SA("채용시"))["due"] is None
     assert cs.saramin_status("<html></html>") is None
+    body = '<html><body>접수기간 : 2026-11-11 13시 ~ 2027-01-10 24시</body></html>'
+    assert cs.saramin_status(body) == {"due": date(2027, 1, 10), "kind": "date"}
     assert cs.jobkorea_status(JK("2026.06.15")) == {"due": date(2026, 6, 15), "kind": "date"}
     assert cs.wanted_status(WD("close", None))["closed"] is True and cs.wanted_status(WD("active", "2026-11-30"))["due"] == date(2026, 11, 30)
     assert cs.wanted_status(WD("draft", None))["closed"] and cs.wanted_status("not json") is None

@@ -211,7 +211,15 @@ def _meta_due(html: str) -> dict | None:
 
 
 def saramin_status(html: str) -> dict | None:
-    return _meta_due(html)
+    meta = _meta_due(html)
+    if meta is not None:
+        return meta
+    # 일부 사람인 상세 페이지에는 마감일 메타 태그가 없고 본문의 접수기간만 있다.
+    text = BeautifulSoup(html, "html.parser").get_text(" ", strip=True)
+    m = re.search(r"접수기간\s*[:：]?\s*\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2}.{0,35}?~\s*(\d{4}[.\-/]\d{1,2}[.\-/]\d{1,2})", text)
+    if m and (due := _date_of(m.group(1))):
+        return {"due": due, "kind": "date"}
+    return None
 
 
 def jobkorea_status(html: str) -> dict | None:

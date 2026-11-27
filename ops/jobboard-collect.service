@@ -10,10 +10,10 @@ Environment=COLLECT_SOURCE=saramin
 Environment="COLLECT_ARGS=--apply --details --ai-images 0 --no-judge --no-watch --max-pages 1 --max-requests 2000"
 Environment=COMPANY_MAX=10
 Environment=GEO_MAX=0
-Environment=FIND_MAX=0
+Environment=FIND_MAX=10
 Environment=NEWS_MAX=0
-Environment=REFRESH_MAX=0
-Environment=FILL_MAX=0
+Environment=REFRESH_MAX=50
+Environment=FILL_MAX=10
 Environment=PREP_MAX=0
 ExecStart=/bin/bash /home/ubuntu/jobboard/ops/collect_daily.sh
 TimeoutStartSec=3h
