@@ -6,7 +6,8 @@
 
 - 외부 주소: `https://129.225.169.60.sslip.io/board.html` (임시 도메인, HTTPS 인증서 검증 완료). SSH는 22번 포트만 사용합니다.
 - 일일 수집: `jobboard-collect.timer`가 **매일 03:17 KST**에 `/home/ubuntu/jobboard/ops/collect_daily.sh`를 실행합니다. `ops/install_cron.sh`의 cron은 설치하지 않았으며 같은 작업을 중복 등록하지 마세요.
-- 예약 설정은 `ops/jobboard-collect.service`에 있습니다. 현재 사람인 텍스트 공고의 상세·회사 정보·마감 상태를 검증해 저장합니다. 이미지 OCR과 서버 AI 제목 판정은 꺼져 있습니다. 회사 보강·마감 갱신·빈칸 채우기·지원 준비는 이 예약에서 0으로 설정되어 별도로 실행해야 합니다.
+- 예약 설정은 `ops/jobboard-collect.service`에 있습니다. 현재 사람인 텍스트 공고의 상세·회사 정보·마감 상태를 검증해 저장하고, 이어서 **기존 회사 정보 최대 10곳을 갱신**합니다. 이미지 OCR과 서버 AI 제목 판정은 꺼져 있습니다. 회사명만으로 번호 찾기·뉴스·좌표 추가·마감 갱신·빈칸 채우기·지원 준비는 이 예약에서 0으로 설정되어 별도로 실행해야 합니다.
+- 기존 회사 정보 보강은 11월 27일 10곳을 먼저 실행해 새 회사 1곳·기존 회사 9곳이 정상 반영되는 것을 확인했습니다. 실행 전 DB 백업은 서버의 `/home/ubuntu/backup_before_company_enrich_2026-11-27.sql`입니다.
 - 11월 27일 첫 예약 실행은 요청 상한 250건에 걸려 **0건 저장**됐습니다. 상한과 페이지 수를 보정한 다음 실제 공고 1개 검색어로 재검증해 17건을 저장했습니다. 대상 밖인 기계·현장 직무 5건과 실제 고용 회사가 아닌 채용대행사 공고 3건을 각각 백업 후 삭제해 **9건**을 남겼습니다. 다음 전체 예약 실행 결과는 `systemctl status jobboard-collect.service`, `tail -n 100 /var/log/jobboard-collect.log`, `docker compose exec -T api python -m scripts.collect --report 5`로 확인하세요.
 - 코드 변경은 서버 파일과 GitHub `main`에 함께 반영합니다. 다만 **자동 배포는 아직 설정되지 않았습니다**. GitHub에 push하는 것만으로 운영 서버가 갱신되지는 않습니다.
 
