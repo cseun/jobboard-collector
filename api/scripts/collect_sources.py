@@ -249,7 +249,7 @@ def saramin_company_parse(html: str) -> dict | None:
     soup = BeautifulSoup(html, "html.parser")
     summ = [_txt(li) for li in soup.select(".company_summary li.company_summary_item")]
     det = []
-    for dl in soup.select(".company_details dl"):
+    for dl in soup.select(".company_details dl, .company_details_group"):
         for dt in dl.select("dt"):
             dd = dt.find_next_sibling("dd")
             val = re.sub(r"\s*(지도보기|펼쳐보기|접기)\s*$", "", _txt(dd)) if dd else ""

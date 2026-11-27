@@ -37,4 +37,4 @@ if ! flock -n 9; then echo "[$(date '+%F %T')] 이미 실행 중이라 건너뜀
 } >> "$LOG" 2>&1
 # 로그가 커지면 최근 3000줄만 남김
 [ "$(wc -l < "$LOG")" -gt 6000 ] && tail -n 3000 "$LOG" > "$LOG.tmp" && mv "$LOG.tmp" "$LOG"
-exit 0
+exit "$rc"

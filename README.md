@@ -2,6 +2,8 @@
 
 초대 코드로 가입한 사람만 로그인해서 **보드 화면 전체**를 쓰는 서버입니다. 공고는 모두 같이 보고, 내 정보·공고별 준비·제출 서류는 **계정별로 따로** 저장됩니다.
 
+**운영 보드:** [HTTPS로 열기](https://129.225.169.60.sslip.io/board.html) · 임시 도메인입니다. 서버 자동 수집 상태와 실행 설정은 [업데이트 안내](docs/UPDATE_GUIDE.md)를 참고하세요.
+
 ## 화면으로 보는 채용보드
 
 [**직접 눌러보는 체험 화면**](docs/interactive-demo.html) · [GitHub에서 화면 슬라이드 넘겨 보기](docs/tour/01-dashboard.md) · [PC 브라우저용 슬라이드](docs/product-tour.html)

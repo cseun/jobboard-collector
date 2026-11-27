@@ -110,6 +110,19 @@ def company_summary(comp: dict) -> str:
         (x[3:].strip() for x in det if x.startswith("업종 ")), "")
 
 
+def unrelated_role_reason(title: str, work: str) -> str:
+    """명백한 비SW 현장·기계 직무는 회사 업종이나 검색어와 무관하게 제외한다."""
+    hay = f"{title} {work}"
+    software = re.search(r"SW|S/W|Software|소프트웨어|프로그래밍|코딩|Python|C\+\+|Java|ROS|PLC|MES|LIMS|VLM|\bAI\b|\bAPI\b|알고리즘|Compiler|운영체제|플랫폼", hay, re.I)
+    if software:
+        return ""
+    if re.search(r"감속기|액추에이터|기구\s*설계|기계\s*설계|생산\s*공정\s*관리", hay):
+        return "기계·생산 직무"
+    if re.search(r"서비스\s*직원|서비스\s*관리|고객\s*응대|현장\s*설치|기술영업", hay):
+        return "현장 서비스·설치 직무"
+    return ""
+
+
 def quality_reason(p: dict, d: dict, comp: dict | None, live: dict | None, ref: date) -> str:
     """상세·회사 정보와 실제 마감을 검증한 공고만 저장한다."""
     if p.get("src", "saramin") != "saramin":
@@ -120,6 +133,9 @@ def quality_reason(p: dict, d: dict, comp: dict | None, live: dict | None, ref: 
     sections = parse_sections(info.get("text") or "")
     if not sections.get("담당 업무") or not sections.get("필수"):
         return "업무·필수 항목 구분 실패"
+    unrelated = unrelated_role_reason(p.get("title", ""), sections["담당 업무"])
+    if unrelated:
+        return unrelated
     if not live or (live.get("due") and live["due"] < ref) or (
         not live.get("due") and live.get("kind") not in ("상시", "채용시")
     ):
@@ -687,6 +703,10 @@ def _run(keywords, apply, details, ai_images, email, fetch, ref, say, stop_known
                 sections = parse_sections(info.get("text") or "")
                 if not sections.get("담당 업무") or not sections.get("필수"):
                     rejected["업무·필수 항목 구분 실패"] += 1
+                    continue
+                unrelated = unrelated_role_reason(p.get("title", ""), sections["담당 업무"])
+                if unrelated:
+                    rejected[unrelated] += 1
                     continue
                 try:
                     live = saramin_status(fetch(SOURCES["saramin"].view(p["id"])))

@@ -1,0 +1,10 @@
+[Unit]
+Description=Run verified jobboard collection daily at 03:17 KST
+
+[Timer]
+OnCalendar=*-*-* 03:17:00 Asia/Seoul
+Persistent=true
+Unit=jobboard-collect.service
+
+[Install]
+WantedBy=timers.target

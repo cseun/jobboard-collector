@@ -1,0 +1,16 @@
+[Unit]
+Description=Collect verified jobboard postings and refresh data
+Wants=network-online.target
+After=network-online.target docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/home/ubuntu/jobboard
+Environment=COLLECT_SOURCE=saramin
+Environment="COLLECT_ARGS=--apply --details --ai-images 0 --no-judge --no-watch --max-pages 1 --max-requests 2000"
+Environment=COMPANY_MAX=0
+Environment=REFRESH_MAX=0
+Environment=FILL_MAX=0
+Environment=PREP_MAX=0
+ExecStart=/bin/bash /home/ubuntu/jobboard/ops/collect_daily.sh
+TimeoutStartSec=3h

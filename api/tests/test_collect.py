@@ -60,6 +60,12 @@ def test_quality_requires_structured_detail_company_and_live_deadline():
                              {"due": date(2026, 12, 9), "kind": "date"}, TODAY)
 
 
+def test_unrelated_field_and_mechanical_roles_are_excluded():
+    assert co.unrelated_role_reason("로봇 감속기 설계 엔지니어", "감속기 메커니즘 설계 및 도면 작성") == "기계·생산 직무"
+    assert co.unrelated_role_reason("자동화 사업 현장 설치", "자동화 기계 현장 설치 및 기술영업") == "현장 서비스·설치 직무"
+    assert co.unrelated_role_reason("로봇 제어 SW 엔지니어", "로봇용 액추에이터 제어 SW 개발") == ""
+
+
 def fake_fetch(pages):
     calls = []
 

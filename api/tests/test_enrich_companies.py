@@ -50,6 +50,14 @@ def test_company_page_parser():
     assert cs.saramin_company_url("ab+/c=") == "https://www.saramin.co.kr/zf_user/company-info/view?csn=ab%2B%2Fc="
 
 
+def test_company_page_parser_current_group_markup():
+    html = '<div class="company_details_group"><dt class="tit">사업내용</dt><dd class="desc"><p class="ellipsis" title="로봇 제어 SW 개발">로봇 제어 SW 개발</p></dd></div>'
+    html += '<div class="company_details_group"><dt class="tit">업종</dt><dd class="desc">소프트웨어 개발업</dd></div>'
+    parsed = cs.saramin_company_parse(html)
+    assert parsed["fields"]["사업내용"] == "로봇 제어 SW 개발"
+    assert parsed["fields"]["업종"] == "소프트웨어 개발업"
+
+
 def test_list_parser_and_row_carry_csn(client):
     items = cs.saramin_parse(LIST)
     assert all(i["csn"] for i in items) or True
