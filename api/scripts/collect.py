@@ -123,6 +123,19 @@ def unrelated_role_reason(title: str, work: str) -> str:
     return ""
 
 
+def recruiter_company_reason(company: str, comp: dict | None) -> str:
+    """채용대행사 정보가 실제 고용 회사의 정보로 저장되지 않도록 한다."""
+    fields = (comp or {}).get("fields") or {}
+    industry, business = fields.get("업종", ""), fields.get("사업내용", "")
+    if re.search(r"고용\s*알선|헤드헌팅|인력\s*공급|직업\s*소개", f"{industry} {business}"):
+        return "실제 채용 회사 미확인(채용대행사)"
+    if re.search(r"채용\s*대행", business):
+        return "실제 채용 회사 미확인(채용대행사)"
+    if re.search(r"시설관리.*용역", industry) and re.search(r"에이치알|\bHR\b", company, re.I):
+        return "실제 채용 회사 미확인(채용대행사)"
+    return ""
+
+
 def quality_reason(p: dict, d: dict, comp: dict | None, live: dict | None, ref: date) -> str:
     """상세·회사 정보와 실제 마감을 검증한 공고만 저장한다."""
     if p.get("src", "saramin") != "saramin":
@@ -142,6 +155,9 @@ def quality_reason(p: dict, d: dict, comp: dict | None, live: dict | None, ref: 
         return "실제 접수 상태 확인 실패 또는 마감"
     if not comp or not company_summary(comp):
         return "회사 사업 정보 없음"
+    recruiter = recruiter_company_reason(p.get("company", ""), comp)
+    if recruiter:
+        return recruiter
     d["_sections"], d["_company"], d["_live"] = sections, comp, live
     return ""
 

@@ -66,6 +66,12 @@ def test_unrelated_field_and_mechanical_roles_are_excluded():
     assert co.unrelated_role_reason("로봇 제어 SW 엔지니어", "로봇용 액추에이터 제어 SW 개발") == ""
 
 
+def test_recruiter_is_not_treated_as_hiring_company():
+    assert co.recruiter_company_reason("닥터파인드", {"fields": {"업종": "고용 알선업"}})
+    assert co.recruiter_company_reason("디퍼런트에이치알", {"fields": {"사업내용": "채용대행, 헤드헌팅"}})
+    assert co.recruiter_company_reason("로봇제조사", {"fields": {"업종": "산업용 로봇 제조업"}}) == ""
+
+
 def fake_fetch(pages):
     calls = []
 
