@@ -153,7 +153,10 @@ const ivOf = name => interviews.find(x => x.key && (coKey(name).includes(x.key) 
 const state = { career: store.get('career', 'all'), careerN: store.get('careerN', '3'), emp: store.get('emp', ''), salMin: store.get('salMin', ''), salUnk: store.get('salUnk', '1') === '1', edu: store.get('edu', ''), cat: store.get('cat', ''), role: store.get('role', ''), q: store.get('q', ''), high: store.get('high', '0') === '1', region: store.get('region', ''), area: store.get('area', ''), sort: store.get('sort', 'due'), excluded: false, due: store.get('due', ''), wel: store.get('wel', ''), near: store.get('nearF', ''), mine: store.get('mine', '') };
 
 function ddayBox(dd, due) {
-  if (dd === null) return `<div class="dday"><span>${/^상시/.test(due) ? '상시' : '미정'}</span><small>마감</small></div>`;
+  if (dd === null) {
+    const label = plain(due).replace(/\s/g, '');
+    return `<div class="dday"><span>${/^상시/.test(label) ? '상시' : /^채용시/.test(label) ? '채용시' : /^수시/.test(label) ? '수시' : '미정'}</span><small>마감</small></div>`;
+  }
   const cls = dd < 0 ? 'past' : dd <= 3 ? 'hot' : dd <= 7 ? 'warn' : '';
   return `<div class="dday ${cls}">${dd < 0 ? '마감' : dd === 0 ? 'D-DAY' : 'D-' + dd}<small>${esc(String(due).match(/^\d{1,2}\/\d{1,2}/)[0])}</small></div>`;
 }
