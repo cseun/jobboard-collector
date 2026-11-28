@@ -5,7 +5,7 @@
 
 두 단계:
   1) (요청 0건) 마감일이 오늘보다 앞선 접수 중 공고를 '마감'으로 바꿈
-  2) 접수 중 공고를 오래 확인 안 한 순서로 하루 --max 건(기본 150) 다시 열어 봄
+  2) '미정 마감' 공고를 먼저, 나머지는 오래 확인 안 한 순서로 하루 --max 건(기본 150) 다시 열어 봄
      - 사이트에서 삭제된 공고(404·410) → 마감 · 원티드는 status 가 active 가 아니면 마감
      - 사람인·잡코리아는 공고 페이지의 '마감일'을 읽어 바뀌었으면(연장 등) 고치고, 이미 지났으면 마감
      - '채용시 마감'·상시 공고는 날짜가 없으므로 삭제되기 전까지는 접수 중으로 둠
@@ -30,6 +30,7 @@ from scripts.collect_sources import STATUS_CHECK
 
 MAX_PER_DAY = 150
 CHECKED = "마감 확인일"
+ONGOING = ("상시", "채용시", "수시")
 
 
 def _md(d: date) -> str:
@@ -56,6 +57,15 @@ def free_close(db, ref: date, apply: bool) -> list[Job]:
     return hit
 
 
+def unknown_deadline(job: Job) -> bool:
+    """날짜와 '상시·채용시·수시' 확인도 없는 화면의 '미정 마감' 공고."""
+    if job.deadline_date is not None:
+        return False
+    raw = job.raw or {}
+    label = str(raw.get("마감(KST)") or job.deadline_text or "").replace(" ", "")
+    return not any(word in label for word in ONGOING)
+
+
 def candidates(db, ref: date, sources: list[str], limit: int) -> list[Job]:
     out = []
     for j in db.execute(select(Job).order_by(Job.id)).scalars():
@@ -64,7 +74,7 @@ def candidates(db, ref: date, sources: list[str], limit: int) -> list[Job]:
         if not gaps.is_active(j) or kind not in sources or kind not in STATUS_CHECK or raw.get(CHECKED) == ref.isoformat():
             continue
         out.append(j)
-    out.sort(key=lambda j: ((j.raw or {}).get(CHECKED) or "", j.id))        # 한 번도 안 본 것 먼저, 그다음 오래된 순
+    out.sort(key=lambda j: (0 if unknown_deadline(j) else 1, (j.raw or {}).get(CHECKED) or "", j.id))
     return out[:limit]
 
 
@@ -97,6 +107,9 @@ def check_one(job: Job, fetch, ref: date) -> tuple[str, str]:
         return "due", f"마감일 {_md(due)}로 갱신"
     raw = dict(job.raw or {})
     raw[CHECKED] = ref.isoformat()
+    if not due and st.get("kind") in ONGOING and unknown_deadline(job):
+        raw["마감(KST)"] = st["kind"]
+        job.deadline_text = st["kind"]
     job.raw = raw
     return "open", ""
 
@@ -112,6 +125,15 @@ def run(apply: bool = False, max_n: int = MAX_PER_DAY, sources: list[str] | None
         free = free_close(db, ref, apply)
         out["날짜로 마감"] = len(free)
         todo = candidates(db, ref, sources, max_n)
+        unknown_total = sum(1 for j in db.execute(select(Job)).scalars()
+                            if gaps.is_active(j) and unknown_deadline(j))
+        unknown_supported = sum(1 for j in db.execute(select(Job)).scalars()
+                                if gaps.is_active(j) and unknown_deadline(j)
+                                and ss.canon(j.source_key).split(":")[0] in sources)
+        out["미정 마감 전체"] = unknown_total
+        out["미정 마감 재점검 가능"] = unknown_supported
+        out["미정 마감 출처 미지원"] = unknown_total - unknown_supported
+        out["이번 회차 미정 마감"] = sum(unknown_deadline(j) for j in todo)
         if not apply:
             out["다시 확인할 공고"] = len(todo)
             say(f"→ 마감일 지나 마감 처리할 공고 {len(free)}건 · 다시 확인할 공고 {len(todo)}건(하루 최대 {max_n}). 저장하려면 --apply")

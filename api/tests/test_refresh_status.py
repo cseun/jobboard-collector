@@ -119,6 +119,30 @@ def test_limit_and_oldest_first(client):
     assert [u.split("=")[-1] for u in seen] == ["2", "3"]                      # 안 본 것 → 가장 오래된 것 순
 
 
+def test_unknown_deadlines_before_dated_jobs_and_record_backlog(client):
+    seen = []
+    with SessionLocal() as db:
+        add(db, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=1", "날짜있음", due=date(2026, 12, 9))
+        unknown = add(db, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=2", "미정", raw={"마감(KST)": "미정"})
+        add(db, "https://other.example/jobs/3", "출처미지원", raw={"마감(KST)": "미정"})
+        add(db, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=4", "채용시", raw={"마감(KST)": "채용시"})
+    out = rs.run(apply=True, max_n=1, fetch=lambda u: seen.append(u) or SA("2026-12-15"), ref=TODAY, say=QUIET)
+    assert [u.split("=")[-1] for u in seen] == ["2"]
+    assert (out["미정 마감 전체"], out["미정 마감 재점검 가능"], out["미정 마감 출처 미지원"], out["이번 회차 미정 마감"]) == (2, 1, 1, 1)
+    with SessionLocal() as db:
+        assert db.get(Job, unknown).deadline_date == date(2026, 12, 15)
+
+
+def test_unknown_deadline_resolves_to_ongoing_when_source_says_so(client):
+    with SessionLocal() as db:
+        unknown = add(db, "https://www.saramin.co.kr/zf_user/jobs/relay/view?rec_idx=8", "미정", raw={"마감(KST)": "미정"})
+    rs.run(apply=True, max_n=1, fetch=lambda _: SA("채용시"), ref=TODAY, say=QUIET)
+    with SessionLocal() as db:
+        j = db.get(Job, unknown)
+        assert j.raw["마감(KST)"] == "채용시" and j.deadline_text == "채용시"
+        assert not rs.unknown_deadline(j)
+
+
 def test_block_stops_only_that_site(client):
     seen = []
     with SessionLocal() as db:
